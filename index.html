@@ -4,11 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>School Passport Photo Studio · Pro</title>
-    <!-- Libraries -->
+    <!-- Libraries & Font Awesome -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
-        /* (Same polished styles – no changes) */
         * {
             box-sizing: border-box;
             margin: 0;
@@ -17,60 +17,84 @@
 
         body {
             font-family: 'Segoe UI', Roboto, system-ui, sans-serif;
-            background: linear-gradient(145deg, #1e3c72 0%, #2a5298 100%);
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
             margin: 0;
+            background: linear-gradient(145deg, #0b1a33 0%, #1a3b5c 100%);
+            position: relative;
+        }
+
+        /* Professional login background with subtle pattern */
+        body::before {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" opacity="0.05"><path fill="%23ffffff" d="M20 20 L30 20 L25 30 Z M70 50 L80 50 L75 60 Z M40 80 L50 80 L45 90 Z"/></svg>');
+            background-size: 60px 60px;
+            pointer-events: none;
         }
 
         #loginPage {
             width: 100%;
-            max-width: 400px;
+            max-width: 420px;
             padding: 20px;
+            position: relative;
+            z-index: 2;
         }
 
         .loginBox {
-            background: rgba(255,255,255,0.95);
-            backdrop-filter: blur(8px);
-            padding: 2.5rem 2rem;
-            border-radius: 32px;
-            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+            background: rgba(255,255,255,0.98);
+            backdrop-filter: blur(10px);
+            padding: 2.8rem 2.2rem;
+            border-radius: 40px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,215,0,0.2) inset;
             text-align: center;
-            border: 1px solid rgba(255,255,255,0.3);
+            border: 1px solid rgba(255,215,0,0.3);
+        }
+
+        .login-icon {
+            font-size: 4rem;
+            color: #c9a44c;
+            margin-bottom: 0.5rem;
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.2));
         }
 
         .loginBox h2 {
             font-weight: 600;
-            color: #1e3c72;
+            color: #1a2b4c;
             margin-bottom: 1.8rem;
-            font-size: 2rem;
+            font-size: 2.2rem;
             letter-spacing: -0.5px;
+            border-bottom: 2px solid #c9a44c;
+            display: inline-block;
+            padding-bottom: 8px;
         }
 
         .loginBox input {
             width: 100%;
-            padding: 14px 18px;
-            margin: 10px 0;
-            border: 2px solid #e9eef2;
+            padding: 15px 20px;
+            margin: 12px 0;
+            border: 2px solid #e0e7ff;
             border-radius: 60px;
             font-size: 1rem;
             transition: 0.2s;
             outline: none;
             background: white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         }
 
         .loginBox input:focus {
-            border-color: #2a5298;
-            box-shadow: 0 0 0 3px rgba(42,82,152,0.2);
+            border-color: #c9a44c;
+            box-shadow: 0 0 0 3px rgba(201,164,76,0.3);
         }
 
         .loginBox button {
-            background: #1e3c72;
+            background: linear-gradient(145deg, #1a2b4c, #0f1e36);
             color: white;
             border: none;
-            padding: 14px 30px;
+            padding: 16px 30px;
             font-size: 1.2rem;
             font-weight: 600;
             border-radius: 60px;
@@ -79,25 +103,36 @@
             cursor: pointer;
             transition: 0.2s;
             letter-spacing: 0.5px;
+            box-shadow: 0 8px 0 #0a1424, 0 4px 15px rgba(0,0,0,0.3);
         }
 
         .loginBox button:hover {
-            background: #2a5298;
-            transform: scale(1.02);
+            background: linear-gradient(145deg, #1f3860, #142848);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 0 #0a1424, 0 6px 20px rgba(0,0,0,0.4);
+        }
+
+        .loginBox button:active {
+            transform: translateY(6px);
+            box-shadow: 0 2px 0 #0a1424;
         }
 
         .dev {
-            margin-top: 25px;
-            font-size: 0.9rem;
-            color: #4a5568;
-            border-top: 1px dashed #cbd5e0;
+            margin-top: 30px;
+            font-size: 0.95rem;
+            color: #334155;
+            border-top: 1px dashed #cbd5e1;
             padding-top: 20px;
+            background: #f8fafc;
+            border-radius: 30px;
+            padding: 15px;
         }
 
         .dev b {
-            color: #1e3c72;
+            color: #1a2b4c;
         }
 
+        /* Main App */
         #app {
             display: none;
             width: 100%;
@@ -108,10 +143,11 @@
             box-shadow: 0 30px 60px rgba(0,0,0,0.3);
             padding: 30px;
             backdrop-filter: blur(2px);
+            border: 1px solid rgba(255,215,0,0.2);
         }
 
         .topbar {
-            background: #1e3c72;
+            background: linear-gradient(145deg, #1a2b4c, #0f1e36);
             color: white;
             padding: 22px 28px;
             border-radius: 30px;
@@ -122,29 +158,29 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            box-shadow: 0 8px 0 #0f2542;
+            box-shadow: 0 8px 0 #0a1424;
         }
 
         .logout-btn {
-            background: #dc2626;
-            color: white;
+            background: #c9a44c;
+            color: #1a2b4c;
             border: none;
             padding: 10px 24px;
             border-radius: 40px;
             font-size: 1rem;
-            font-weight: 600;
+            font-weight: 700;
             cursor: pointer;
-            box-shadow: 0 4px 0 #991b1b;
+            box-shadow: 0 4px 0 #8b6f3c;
             transition: all 0.15s;
         }
         .logout-btn:hover {
-            background: #ef4444;
+            background: #dbb45c;
             transform: translateY(-2px);
-            box-shadow: 0 6px 0 #991b1b;
+            box-shadow: 0 6px 0 #8b6f3c;
         }
         .logout-btn:active {
             transform: translateY(4px);
-            box-shadow: 0 2px 0 #991b1b;
+            box-shadow: 0 2px 0 #8b6f3c;
         }
 
         .controls {
@@ -192,8 +228,17 @@
             vertical-align: middle;
         }
 
+        .control-group select {
+            width: 100%;
+            padding: 12px;
+            border-radius: 40px;
+            border: 2px solid #e2e8f0;
+            font-weight: 600;
+            background: white;
+        }
+
         .btn {
-            background: #1e3c72;
+            background: #1a2b4c;
             border: none;
             color: white;
             font-weight: 600;
@@ -202,26 +247,33 @@
             font-size: 1rem;
             cursor: pointer;
             transition: all 0.15s;
-            box-shadow: 0 5px 0 #0f2542;
-            border: 1px solid #2d4b7c;
+            box-shadow: 0 5px 0 #0f1e36;
+            border: 1px solid #c9a44c;
             margin: 0 5px 5px 0;
         }
 
         .btn:hover {
-            background: #2a5298;
+            background: #1f3860;
             transform: translateY(-2px);
-            box-shadow: 0 7px 0 #0f2542;
+            box-shadow: 0 7px 0 #0f1e36;
         }
 
         .btn:active {
             transform: translateY(5px);
-            box-shadow: 0 2px 0 #0f2542;
+            box-shadow: 0 2px 0 #0f1e36;
         }
 
         .btn.secondary {
             background: #475569;
             box-shadow: 0 5px 0 #1e293b;
-            border-color: #334155;
+            border-color: #64748b;
+        }
+
+        .btn.gold {
+            background: #c9a44c;
+            color: #1a2b4c;
+            box-shadow: 0 5px 0 #8b6f3c;
+            border-color: #e2b95c;
         }
 
         .preview-header {
@@ -257,11 +309,12 @@
         }
 
         .badge {
-            background: #2a5298;
-            color: white;
+            background: #c9a44c;
+            color: #1a2b4c;
             padding: 6px 14px;
             border-radius: 40px;
             font-size: 0.85rem;
+            font-weight: 700;
         }
 
         #loadingIndicator {
@@ -277,7 +330,7 @@
             width: 24px;
             height: 24px;
             border: 4px solid #cbd5e1;
-            border-top-color: #1e3c72;
+            border-top-color: #1a2b4c;
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
         }
@@ -287,16 +340,17 @@
 </head>
 <body>
 
-<!-- LOGIN PAGE -->
+<!-- LOGIN PAGE (refined) -->
 <div id="loginPage">
     <div class="loginBox">
-        <h2>📸 Passport Studio</h2>
+        <div class="login-icon"><i class="fas fa-passport"></i></div>
+        <h2>Passport Studio</h2>
         <input type="text" id="user" placeholder="Username" value="admin">
         <input type="password" id="pass" placeholder="Password" value="1234">
-        <button id="loginBtn">Login →</button>
+        <button id="loginBtn"><i class="fas fa-sign-in-alt" style="margin-right: 8px;"></i>Login</button>
         <div class="dev">
-            Developed by <b>MAWERERE FRANCIS</b><br>
-            📞 0788223215 · 📱 +256788223215
+            <i class="fas fa-code"></i> Developed by <b>MAWERERE FRANCIS</b><br>
+            <i class="fas fa-phone-alt"></i> 0788223215 · <i class="fab fa-whatsapp"></i> +256788223215
         </div>
     </div>
 </div>
@@ -304,49 +358,58 @@
 <!-- MAIN APP -->
 <div id="app">
     <div class="topbar">
-        <span>🏫 School Passport Photo System</span>
+        <span><i class="fas fa-school" style="margin-right: 12px;"></i>School Passport System</span>
         <div>
-            <span class="badge">v3.1 · Skin & Smooth</span>
-            <button class="logout-btn" id="logoutBtn">🚪 Logout</button>
+            <span class="badge"><i class="fas fa-magic"></i> v3.2 · Pro</span>
+            <button class="logout-btn" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> Logout</button>
         </div>
     </div>
 
     <div class="controls">
         <div class="control-group" style="flex:2">
-            <label>📁 Upload photos (JPEG/PNG)</label>
+            <label><i class="fas fa-upload"></i> Upload photos</label>
             <input type="file" id="upload" multiple accept="image/*">
         </div>
         <div class="control-group">
-            <label>🔆 Brightness</label>
+            <label><i class="fas fa-sun"></i> Brightness</label>
             <input type="range" id="brightness" min="70" max="150" value="105">
         </div>
         <div class="control-group">
-            <label>✨ Skin lightening</label>
+            <label><i class="fas fa-palette"></i> Skin lightening</label>
             <input type="range" id="skinLighten" min="0" max="30" value="10" step="1">
-            <small>extra brightness</small>
         </div>
         <div class="control-group">
-            <label>🌀 Smoothing (blur)</label>
+            <label><i class="fas fa-wind"></i> Smoothing</label>
             <input type="range" id="smoothBlur" min="0" max="2.0" value="0.4" step="0.1">
         </div>
         <div class="control-group">
+            <label><i class="fas fa-copy"></i> Duplicate (if one photo)</label>
+            <select id="dupSelect">
+                <option value="1">1 (no duplicate)</option>
+                <option value="2">2 copies</option>
+                <option value="4">4 copies</option>
+                <option value="8">8 copies</option>
+            </select>
+        </div>
+        <div class="control-group">
             <label style="display: flex; align-items: center;">
-                <input type="checkbox" id="whiteBG"> ⚪ White background boost
+                <input type="checkbox" id="whiteBG"> <i class="fas fa-tshirt" style="margin-right: 5px;"></i> White background
             </label>
             <label style="display: flex; align-items: center;">
-                <input type="checkbox" id="showName"> 🏷️ Show file name
+                <input type="checkbox" id="showName"> <i class="fas fa-tag"></i> Show file name
             </label>
         </div>
         <div style="display: flex; gap: 5px; flex-wrap: wrap; margin-left: auto;">
-            <button class="btn" id="generateBtn">✨ Generate sheets</button>
-            <button class="btn" id="downloadPNGBtn">📦 PNG (ZIP)</button>
-            <button class="btn" id="downloadPDFBtn">📄 PDF</button>
-            <button class="btn secondary" id="resetBtn">↻ Reset</button>
+            <button class="btn" id="generateBtn"><i class="fas fa-layer-group"></i> Generate sheets</button>
+            <button class="btn" id="downloadPNGBtn"><i class="fas fa-file-archive"></i> PNG ZIP</button>
+            <button class="btn" id="downloadPDFBtn"><i class="fas fa-file-pdf"></i> PDF</button>
+            <button class="btn gold" id="downloadPhotosBtn"><i class="fas fa-images"></i> Photos JPEG</button>
+            <button class="btn secondary" id="resetBtn"><i class="fas fa-undo-alt"></i> Reset</button>
         </div>
     </div>
 
     <div class="preview-header">
-        <h3>📋 Preview (first 3 sheets)</h3>
+        <h3><i class="fas fa-eye"></i> Preview (first 3 sheets)</h3>
         <div id="loadingIndicator"><span class="spinner"></span> Processing ...</div>
     </div>
     <div id="preview"></div>
@@ -371,7 +434,7 @@
 
     // --- State ---
     let imageList = [];             // array of {img, name}
-    let previewPages = [];          // canvases for preview (first few pages)
+    let previewPages = [];
     let abortController = null;
 
     // --- DOM Elements ---
@@ -385,14 +448,33 @@
     const brightnessRange = document.getElementById('brightness');
     const skinLightenRange = document.getElementById('skinLighten');
     const smoothBlurRange = document.getElementById('smoothBlur');
+    const dupSelect = document.getElementById('dupSelect');
     const whiteBGCB = document.getElementById('whiteBG');
     const showNameCB = document.getElementById('showName');
     const generateBtn = document.getElementById('generateBtn');
     const downloadPNGBtn = document.getElementById('downloadPNGBtn');
     const downloadPDFBtn = document.getElementById('downloadPDFBtn');
+    const downloadPhotosBtn = document.getElementById('downloadPhotosBtn');
     const resetBtn = document.getElementById('resetBtn');
     const previewDiv = document.getElementById('preview');
     const loadingIndicator = document.getElementById('loadingIndicator');
+
+    // --- Helper: determine effective duplicate count based on files ---
+    function getEffectiveDupCount() {
+        if (imageList.length === 1) {
+            return parseInt(dupSelect.value, 10);
+        }
+        return 1; // no dup if multiple photos
+    }
+
+    // --- Helper: get image for a given slot considering duplicates ---
+    function getImageForSlot(slotIndex, pageOffset = 0) {
+        // pageOffset unused here because we only generate one page for dup mode,
+        // but for multiple pages we need global index. We'll handle in renderPage.
+        // Instead, we'll pass dupCount to renderPage and handle there.
+        // This function is kept for clarity.
+        return null; // not used directly
+    }
 
     // --- Login ---
     loginBtn.addEventListener('click', () => {
@@ -406,7 +488,6 @@
 
     // --- Logout ---
     logoutBtn.addEventListener('click', () => {
-        // Clean up resources
         imageList.forEach(item => URL.revokeObjectURL(item.img.src));
         imageList = [];
         previewPages = [];
@@ -430,7 +511,7 @@
         }
     });
 
-    // --- Generate Sheets (preview only) ---
+    // --- Generate Sheets (preview) ---
     generateBtn.addEventListener('click', async () => {
         const files = upload.files;
         if (!files || files.length === 0) {
@@ -467,8 +548,9 @@
             const blurAmount = parseFloat(smoothBlurRange.value);
             const whiteBG = whiteBGCB.checked;
             const showName = showNameCB.checked;
+            const dupCount = getEffectiveDupCount();
 
-            await generatePreview(imageList, brightness, skinLighten, blurAmount, whiteBG, showName, signal);
+            await generatePreview(imageList, brightness, skinLighten, blurAmount, whiteBG, showName, dupCount, signal);
 
         } catch (err) {
             if (err.name !== 'AbortError') {
@@ -505,14 +587,20 @@
         });
     }
 
-    async function generatePreview(images, brightness, skinLighten, blurAmount, whiteBG, showName, signal) {
-        const totalPages = Math.ceil(images.length / PHOTOS_PER_PAGE);
+    async function generatePreview(images, brightness, skinLighten, blurAmount, whiteBG, showName, dupCount, signal) {
+        // For preview, we only need first few pages. In dup mode with one image, total pages = 1.
+        let totalPages;
+        if (dupCount > 1 && images.length === 1) {
+            totalPages = 1;
+        } else {
+            totalPages = Math.ceil(images.length / PHOTOS_PER_PAGE);
+        }
         const pagesToShow = Math.min(totalPages, PREVIEW_PAGES);
 
         for (let pageIdx = 0; pageIdx < pagesToShow; pageIdx++) {
             if (signal.aborted) break;
 
-            const canvas = await renderPage(images, pageIdx, brightness, skinLighten, blurAmount, whiteBG, showName);
+            const canvas = await renderPage(images, pageIdx, brightness, skinLighten, blurAmount, whiteBG, showName, dupCount);
             previewPages.push(canvas);
 
             const previewCanvas = canvas.cloneNode(true);
@@ -524,8 +612,8 @@
         }
     }
 
-    // Render a single page
-    async function renderPage(images, pageIdx, brightness, skinLighten, blurAmount, whiteBG, showName) {
+    // Render a single page (with duplication support)
+    async function renderPage(images, pageIdx, brightness, skinLighten, blurAmount, whiteBG, showName, dupCount = 1) {
         const canvas = document.createElement('canvas');
         canvas.width = PAGE_W;
         canvas.height = PAGE_H;
@@ -533,12 +621,34 @@
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, PAGE_W, PAGE_H);
 
-        const startIdx = pageIdx * PHOTOS_PER_PAGE;
-        for (let i = 0; i < PHOTOS_PER_PAGE; i++) {
-            const imgIndex = startIdx + i;
-            if (imgIndex >= images.length) break;
+        const isDupMode = (dupCount > 1 && images.length === 1);
+        const singleImage = isDupMode ? images[0] : null;
 
-            const { img, name } = images[imgIndex];
+        // Determine how many slots to fill on this page
+        let slotsToFill = PHOTOS_PER_PAGE;
+        if (isDupMode && pageIdx === 0) {
+            slotsToFill = dupCount; // only fill requested copies on first page
+        } else if (!isDupMode) {
+            // normal mode: fill based on images left
+            const startIdx = pageIdx * PHOTOS_PER_PAGE;
+            slotsToFill = Math.min(PHOTOS_PER_PAGE, images.length - startIdx);
+        } else {
+            // dup mode but beyond first page: no images (should not happen as totalPages=1)
+            slotsToFill = 0;
+        }
+
+        for (let i = 0; i < slotsToFill; i++) {
+            let img, name;
+            if (isDupMode) {
+                img = singleImage.img;
+                name = singleImage.name + (dupCount > 1 ? `_copy${i+1}` : '');
+            } else {
+                const idx = pageIdx * PHOTOS_PER_PAGE + i;
+                if (idx >= images.length) break;
+                img = images[idx].img;
+                name = images[idx].name;
+            }
+
             const [x, y] = GRID[i];
 
             const photoCanvas = cropToPassport(img, PHOTO_W, PHOTO_H);
@@ -588,12 +698,10 @@
 
     function applyFilters(photoCanvas, brightness, skinLighten, blurAmount, whiteBG) {
         const ctx = photoCanvas.getContext('2d');
-        // Base filter: brightness + skin lightening (extra brightness) + smoothing blur + slight contrast/saturation
         const totalBrightness = brightness + skinLighten;
         let filter = `brightness(${totalBrightness}%) contrast(108%) saturate(105%) blur(${blurAmount}px)`;
 
         if (whiteBG) {
-            // Boost whites: more contrast, push midtones up
             filter = `brightness(${Math.min(150, totalBrightness + 10)}%) contrast(118%) saturate(102%) blur(${blurAmount}px)`;
         }
 
@@ -606,26 +714,33 @@
         return filename.replace(/\.[^/.]+$/, "").substring(0, 20);
     }
 
-    // --- ZIP download ---
+    // --- ZIP download (PNG sheets) ---
     downloadPNGBtn.addEventListener('click', async () => {
         if (imageList.length === 0) {
             alert('Please generate sheets first (or upload photos).');
             return;
         }
 
-        const totalPages = Math.ceil(imageList.length / PHOTOS_PER_PAGE);
         const brightness = parseInt(brightnessRange.value, 10);
         const skinLighten = parseInt(skinLightenRange.value, 10);
         const blurAmount = parseFloat(smoothBlurRange.value);
         const whiteBG = whiteBGCB.checked;
         const showName = showNameCB.checked;
+        const dupCount = getEffectiveDupCount();
+
+        let totalPages;
+        if (dupCount > 1 && imageList.length === 1) {
+            totalPages = 1;
+        } else {
+            totalPages = Math.ceil(imageList.length / PHOTOS_PER_PAGE);
+        }
 
         loadingIndicator.style.display = 'flex';
         try {
             const zip = new JSZip();
 
             for (let pageIdx = 0; pageIdx < totalPages; pageIdx++) {
-                const canvas = await renderPage(imageList, pageIdx, brightness, skinLighten, blurAmount, whiteBG, showName);
+                const canvas = await renderPage(imageList, pageIdx, brightness, skinLighten, blurAmount, whiteBG, showName, dupCount);
                 const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png', 0.9));
                 zip.file(`page_${pageIdx+1}.png`, blob);
                 canvas.width = 0; canvas.height = 0;
@@ -654,12 +769,19 @@
             return;
         }
 
-        const totalPages = Math.ceil(imageList.length / PHOTOS_PER_PAGE);
         const brightness = parseInt(brightnessRange.value, 10);
         const skinLighten = parseInt(skinLightenRange.value, 10);
         const blurAmount = parseFloat(smoothBlurRange.value);
         const whiteBG = whiteBGCB.checked;
         const showName = showNameCB.checked;
+        const dupCount = getEffectiveDupCount();
+
+        let totalPages;
+        if (dupCount > 1 && imageList.length === 1) {
+            totalPages = 1;
+        } else {
+            totalPages = Math.ceil(imageList.length / PHOTOS_PER_PAGE);
+        }
 
         loadingIndicator.style.display = 'flex';
         try {
@@ -676,7 +798,7 @@
             for (let pageIdx = 0; pageIdx < totalPages; pageIdx++) {
                 if (pageIdx > 0) pdf.addPage();
 
-                const canvas = await renderPage(imageList, pageIdx, brightness, skinLighten, blurAmount, whiteBG, showName);
+                const canvas = await renderPage(imageList, pageIdx, brightness, skinLighten, blurAmount, whiteBG, showName, dupCount);
                 const imgData = canvas.toDataURL('image/png', 0.9);
                 pdf.addImage(imgData, 'PNG', 0, 0, pdfW, pdfH, undefined, 'FAST');
 
@@ -688,6 +810,61 @@
             pdf.save('passport_photos.pdf');
         } catch (err) {
             alert('PDF generation failed: ' + err.message);
+        } finally {
+            loadingIndicator.style.display = 'none';
+        }
+    });
+
+    // --- Individual Photos as JPEG ZIP ---
+    downloadPhotosBtn.addEventListener('click', async () => {
+        if (imageList.length === 0) {
+            alert('Please upload photos first.');
+            return;
+        }
+
+        const brightness = parseInt(brightnessRange.value, 10);
+        const skinLighten = parseInt(skinLightenRange.value, 10);
+        const blurAmount = parseFloat(smoothBlurRange.value);
+        const whiteBG = whiteBGCB.checked;
+        const dupCount = getEffectiveDupCount();
+
+        loadingIndicator.style.display = 'flex';
+        try {
+            const zip = new JSZip();
+
+            if (dupCount > 1 && imageList.length === 1) {
+                // Duplicate mode: generate N copies
+                const img = imageList[0].img;
+                const baseName = cleanName(imageList[0].name);
+                for (let copy = 0; copy < dupCount; copy++) {
+                    const photoCanvas = cropToPassport(img, PHOTO_W, PHOTO_H);
+                    applyFilters(photoCanvas, brightness, skinLighten, blurAmount, whiteBG);
+                    const blob = await new Promise(resolve => photoCanvas.toBlob(resolve, 'image/jpeg', 0.92));
+                    zip.file(`${baseName}_copy${copy+1}.jpg`, blob);
+                }
+            } else {
+                // Normal mode: one per image
+                for (let idx = 0; idx < imageList.length; idx++) {
+                    const img = imageList[idx].img;
+                    const baseName = cleanName(imageList[idx].name);
+                    const photoCanvas = cropToPassport(img, PHOTO_W, PHOTO_H);
+                    applyFilters(photoCanvas, brightness, skinLighten, blurAmount, whiteBG);
+                    const blob = await new Promise(resolve => photoCanvas.toBlob(resolve, 'image/jpeg', 0.92));
+                    zip.file(`${baseName}.jpg`, blob);
+
+                    if (idx % 10 === 0) await new Promise(r => setTimeout(r, 0));
+                }
+            }
+
+            const zipBlob = await zip.generateAsync({ type: 'blob' });
+            const url = URL.createObjectURL(zipBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'individual_photos.zip';
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            alert('Photo ZIP failed: ' + err.message);
         } finally {
             loadingIndicator.style.display = 'none';
         }
