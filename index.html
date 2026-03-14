@@ -3,13 +3,10 @@
 <head>
 
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
 <title>School Passport Photo Studio</title>
 
-<script src="https://cdn.jsdelivr.net/npm/face-api.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
@@ -17,10 +14,10 @@
 body{
 margin:0;
 font-family:Arial;
-background:#f4f6f9;
+background:linear-gradient(135deg,#4facfe,#00f2fe);
 }
 
-/* LOGIN */
+/* LOGIN PAGE */
 
 #loginPage{
 display:flex;
@@ -32,21 +29,37 @@ justify-content:center;
 .loginBox{
 background:white;
 padding:30px;
-border-radius:8px;
-box-shadow:0 0 10px rgba(0,0,0,0.1);
-width:300px;
+border-radius:10px;
+box-shadow:0 10px 25px rgba(0,0,0,0.2);
+width:320px;
 text-align:center;
+}
+
+.loginBox h2{
+color:#2c3e50;
 }
 
 .loginBox input{
 width:90%;
 padding:10px;
 margin:10px 0;
+border:1px solid #ccc;
+border-radius:5px;
 }
 
 .loginBox button{
+background:#3498db;
+color:white;
+border:none;
 padding:10px 20px;
+border-radius:5px;
 cursor:pointer;
+}
+
+.dev{
+margin-top:15px;
+font-size:13px;
+color:#555;
 }
 
 /* APP */
@@ -54,25 +67,38 @@ cursor:pointer;
 #app{
 display:none;
 padding:20px;
+background:#f4f6f9;
+min-height:100vh;
 }
 
 .topbar{
 background:#2c3e50;
 color:white;
-padding:10px;
+padding:12px;
+border-radius:6px;
+margin-bottom:15px;
 }
 
 .controls{
 background:white;
-padding:15px;
-border-radius:6px;
+padding:20px;
+border-radius:8px;
 margin-bottom:20px;
+box-shadow:0 3px 10px rgba(0,0,0,0.1);
 }
 
 button{
-padding:10px 15px;
-margin-top:10px;
+padding:10px 16px;
+margin:6px;
+border:none;
+border-radius:5px;
 cursor:pointer;
+background:#3498db;
+color:white;
+}
+
+button:hover{
+background:#2980b9;
 }
 
 canvas{
@@ -97,23 +123,30 @@ flex-wrap:wrap;
 
 <div class="loginBox">
 
-<h3>Passport Studio Login</h3>
+<h2>Passport Photo Studio</h2>
 
 <input id="user" placeholder="Username">
+
 <input id="pass" type="password" placeholder="Password">
 
 <button onclick="login()">Login</button>
 
+<div class="dev">
+Developed by <b>MAWERERE FRANCIS</b><br>
+Tel: 0788223215<br>
+WhatsApp: +256788223215
 </div>
 
 </div>
 
-<!-- APP -->
+</div>
+
+<!-- MAIN APP -->
 
 <div id="app">
 
 <div class="topbar">
-School Passport Photo Studio
+School Passport Photo Production System
 </div>
 
 <div class="controls">
@@ -133,10 +166,6 @@ Layout
 
 <br><br>
 
-<input type="checkbox" id="removeBG"> Remove Background
-
-<br><br>
-
 Show learner name under photo
 
 <input type="checkbox" id="showName">
@@ -149,7 +178,7 @@ Brightness
 
 <br><br>
 
-<button onclick="generate()">Generate Sheets</button>
+<button onclick="generateSheets()">Generate Sheets</button>
 <button onclick="downloadPNG()">Download PNG</button>
 <button onclick="downloadPDF()">Download PDF</button>
 
@@ -175,13 +204,13 @@ document.getElementById("app").style.display="block"
 
 }else{
 
-alert("Wrong login")
+alert("Incorrect login")
 
 }
 
 }
 
-/* PHOTO SETTINGS */
+/* SETTINGS */
 
 const DPI=300
 const photoW=450
@@ -189,128 +218,65 @@ const photoH=600
 
 let pages=[]
 
-async function generate(){
+function generateSheets(){
+
+pages=[]
 
 const files=document.getElementById("upload").files
 const layout=document.getElementById("layout").value
 const brightness=document.getElementById("brightness").value
-const removeBG=document.getElementById("removeBG").checked
 const showName=document.getElementById("showName").checked
 
+const preview=document.getElementById("preview")
+preview.innerHTML=""
+
 if(files.length==0){
-alert("Upload photos")
+
+alert("Upload photos first")
 return
+
 }
 
-await faceapi.nets.tinyFaceDetector.loadFromUri("https://cdn.jsdelivr.net/npm/face-api.js/weights")
-
-let photos=[]
+let images=[]
+let loaded=0
 
 for(let file of files){
 
 let img=new Image()
+
+img.onload=function(){
+
+images.push({img:img,name:file.name})
+
+loaded++
+
+if(loaded===files.length){
+
+processImages(images,layout,brightness,showName)
+
+}
+
+}
+
 img.src=URL.createObjectURL(file)
 
-await new Promise(r=>img.onload=r)
-
-let canvas=document.createElement("canvas")
-canvas.width=photoW
-canvas.height=photoH
-
-let ctx=canvas.getContext("2d")
-
-ctx.filter=`brightness(${brightness}%) contrast(105%)`
-
-let face=await faceapi.detectSingleFace(img,new faceapi.TinyFaceDetectorOptions())
-
-if(face){
-
-let box=face.box
-
-let size=Math.max(box.width,box.height)*2
-
-let sx=Math.max(0,box.x+box.width/2-size/2)
-let sy=Math.max(0,box.y+box.height/2-size/2)
-
-ctx.drawImage(img,sx,sy,size,size,0,0,photoW,photoH)
-
-}else{
-
-ctx.drawImage(img,0,0,photoW,photoH)
-
-}
-
-if(removeBG){
-await removeBackground(canvas)
-}
-
-if(showName){
-
-ctx.fillStyle="black"
-ctx.font="28px Arial"
-ctx.textAlign="center"
-
-let name=file.name.split(".")[0]
-
-ctx.fillText(name,photoW/2,photoH-10)
-
-}
-
-photos.push(canvas)
-
-}
-
-buildPages(photos,layout)
-
-}
-
-/* BACKGROUND REMOVE */
-
-async function removeBackground(canvas){
-
-const net=await bodyPix.load()
-
-const segmentation=await net.segmentPerson(canvas)
-
-let ctx=canvas.getContext("2d")
-let img=ctx.getImageData(0,0,canvas.width,canvas.height)
-
-for(let i=0;i<segmentation.data.length;i++){
-
-if(segmentation.data[i]==0){
-
-img.data[i*4]=255
-img.data[i*4+1]=255
-img.data[i*4+2]=255
-
 }
 
 }
 
-ctx.putImageData(img,0,0)
+function processImages(images,layout,brightness,showName){
 
-}
+let perPage = layout==="A4"?40:8
 
-/* BUILD PAGE */
+let pageW = layout==="A4"?2480:1800
+let pageH = layout==="A4"?3508:1200
 
-function buildPages(list,layout){
+let cols = layout==="A4"?5:4
+let rows = layout==="A4"?8:2
 
-pages=[]
+let totalPages=Math.ceil(images.length/perPage)
 
-let perPage=layout==="A4"?40:8
-
-let pageW=layout==="A4"?2480:1800
-let pageH=layout==="A4"?3508:1200
-
-let cols=layout==="A4"?5:4
-let rows=layout==="A4"?8:2
-
-let preview=document.getElementById("preview")
-preview.innerHTML=""
-
-let total=Math.ceil(list.length/perPage)
-
-for(let p=0;p<total;p++){
+for(let p=0;p<totalPages;p++){
 
 let canvas=document.createElement("canvas")
 canvas.width=pageW
@@ -318,24 +284,53 @@ canvas.height=pageH
 
 let ctx=canvas.getContext("2d")
 
+ctx.filter="brightness("+brightness+"%) contrast(105%)"
+
 for(let r=0;r<rows;r++){
 
 for(let c=0;c<cols;c++){
 
 let index=p*perPage+r*cols+c
-if(index>=list.length) break
+if(index>=images.length) break
+
+let img=images[index].img
+let name=images[index].name
 
 let x=c*photoW
 let y=r*photoH
 
-ctx.drawImage(list[index],x,y,photoW,photoH)
+/* proportional crop */
+
+let size=Math.min(img.width,img.height)
+
+let sx=(img.width-size)/2
+let sy=(img.height-size)/2
+
+ctx.drawImage(
+img,
+sx,sy,size,size,
+x,y,
+photoW,photoH
+)
+
+if(showName){
+
+ctx.fillStyle="black"
+ctx.font="24px Arial"
+ctx.textAlign="center"
+
+let label=name.split(".")[0]
+
+ctx.fillText(label,x+photoW/2,y+photoH-10)
+
+}
 
 }
 
 }
 
 pages.push(canvas)
-preview.appendChild(canvas)
+document.getElementById("preview").appendChild(canvas)
 
 }
 
@@ -345,12 +340,16 @@ preview.appendChild(canvas)
 
 function downloadPNG(){
 
+if(pages.length==0){
+alert("Generate sheets first")
+return
+}
+
 pages.forEach((c,i)=>{
 
 let a=document.createElement("a")
-a.download="passport_"+(i+1)+".png"
+a.download="passport_page_"+(i+1)+".png"
 a.href=c.toDataURL()
-
 a.click()
 
 })
@@ -359,9 +358,18 @@ a.click()
 
 function downloadPDF(){
 
+if(pages.length==0){
+alert("Generate sheets first")
+return
+}
+
 const {jsPDF}=window.jspdf
 
-let pdf=new jsPDF({orientation:"portrait",unit:"px",format:"a4"})
+let pdf=new jsPDF({
+orientation:"portrait",
+unit:"px",
+format:"a4"
+})
 
 pages.forEach((c,i)=>{
 
