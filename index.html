@@ -1,240 +1,29 @@
-<!DOCTYPE html>
-<html>
-<head>
-
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-
-<title>School Passport Photo Studio</title>
-
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-
-<style>
-
-body{
-margin:0;
-font-family:Arial;
-background:linear-gradient(135deg,#4facfe,#00f2fe);
-}
-
-/* LOGIN PAGE */
-
-#loginPage{
-display:flex;
-height:100vh;
-align-items:center;
-justify-content:center;
-}
-
-.loginBox{
-background:white;
-padding:30px;
-border-radius:10px;
-box-shadow:0 10px 25px rgba(0,0,0,0.2);
-width:320px;
-text-align:center;
-}
-
-.loginBox h2{
-color:#2c3e50;
-}
-
-.loginBox input{
-width:90%;
-padding:10px;
-margin:10px 0;
-border:1px solid #ccc;
-border-radius:5px;
-}
-
-.loginBox button{
-background:#3498db;
-color:white;
-border:none;
-padding:10px 20px;
-border-radius:5px;
-cursor:pointer;
-}
-
-.dev{
-margin-top:15px;
-font-size:13px;
-color:#555;
-}
-
-/* APP */
-
-#app{
-display:none;
-padding:20px;
-background:#f4f6f9;
-min-height:100vh;
-}
-
-.topbar{
-background:#2c3e50;
-color:white;
-padding:12px;
-border-radius:6px;
-margin-bottom:15px;
-}
-
-.controls{
-background:white;
-padding:20px;
-border-radius:8px;
-margin-bottom:20px;
-box-shadow:0 3px 10px rgba(0,0,0,0.1);
-}
-
-button{
-padding:10px 16px;
-margin:6px;
-border:none;
-border-radius:5px;
-cursor:pointer;
-background:#3498db;
-color:white;
-}
-
-button:hover{
-background:#2980b9;
-}
-
-canvas{
-border:1px solid #ccc;
-margin:10px;
-}
-
-#preview{
-display:flex;
-flex-wrap:wrap;
-}
-
-</style>
-
-</head>
-
-<body>
-
-<!-- LOGIN -->
-
-<div id="loginPage">
-
-<div class="loginBox">
-
-<h2>Passport Photo Studio</h2>
-
-<input id="user" placeholder="Username">
-
-<input id="pass" type="password" placeholder="Password">
-
-<button onclick="login()">Login</button>
-
-<div class="dev">
-Developed by <b>MAWERERE FRANCIS</b><br>
-Tel: 0788223215<br>
-WhatsApp: +256788223215
-</div>
-
-</div>
-
-</div>
-
-<!-- MAIN APP -->
-
-<div id="app">
-
-<div class="topbar">
-School Passport Photo Production System
-</div>
-
-<div class="controls">
-
-Upload Photos
-<br>
-<input type="file" id="upload" multiple accept="image/*">
-
-<br><br>
-
-Layout
-
-<select id="layout">
-<option value="4x6">4x6 (8 photos)</option>
-<option value="A4">A4 (40 photos)</option>
-</select>
-
-<br><br>
-
-Show learner name under photo
-
-<input type="checkbox" id="showName">
-
-<br><br>
-
-Brightness
-
-<input type="range" id="brightness" min="80" max="130" value="100">
-
-<br><br>
-
-<button onclick="generateSheets()">Generate Sheets</button>
-<button onclick="downloadPNG()">Download PNG</button>
-<button onclick="downloadPDF()">Download PDF</button>
-
-</div>
-
-<div id="preview"></div>
-
-</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
 <script>
 
-/* LOGIN */
+const DPI = 300
+const photoW = 450
+const photoH = 600
 
-function login(){
+const pageWidth = 1800
+const pageHeight = 1200
 
-let u=document.getElementById("user").value
-let p=document.getElementById("pass").value
-
-if(u==="admin" && p==="1234"){
-
-document.getElementById("loginPage").style.display="none"
-document.getElementById("app").style.display="block"
-
-}else{
-
-alert("Incorrect login")
-
-}
-
-}
-
-/* SETTINGS */
-
-const DPI=300
-const photoW=450
-const photoH=600
-
-let pages=[]
+let pages = []
 
 function generateSheets(){
 
 pages=[]
 
 const files=document.getElementById("upload").files
-const layout=document.getElementById("layout").value
 const brightness=document.getElementById("brightness").value
+const removeBG=document.getElementById("removeBG")?.checked
 const showName=document.getElementById("showName").checked
 
-const preview=document.getElementById("preview")
-preview.innerHTML=""
-
 if(files.length==0){
-
 alert("Upload photos first")
 return
-
 }
 
 let images=[]
@@ -247,13 +36,10 @@ let img=new Image()
 img.onload=function(){
 
 images.push({img:img,name:file.name})
-
 loaded++
 
 if(loaded===files.length){
-
-processImages(images,layout,brightness,showName)
-
+processImages(images,brightness,removeBG,showName)
 }
 
 }
@@ -264,95 +50,121 @@ img.src=URL.createObjectURL(file)
 
 }
 
-function processImages(images,layout,brightness,showName){
+function processImages(images,brightness,removeBG,showName){
 
-let perPage = layout==="A4"?40:8
-
-let pageW = layout==="A4"?2480:1800
-let pageH = layout==="A4"?3508:1200
-
-let cols = layout==="A4"?5:4
-let rows = layout==="A4"?8:2
-
+let perPage=8
 let totalPages=Math.ceil(images.length/perPage)
 
 for(let p=0;p<totalPages;p++){
 
 let canvas=document.createElement("canvas")
-canvas.width=pageW
-canvas.height=pageH
+canvas.width=pageWidth
+canvas.height=pageHeight
 
 let ctx=canvas.getContext("2d")
 
-ctx.filter="brightness("+brightness+"%) contrast(105%)"
+let positions=[
+[0,0],[450,0],[900,0],[1350,0],
+[0,600],[450,600],[900,600],[1350,600]
+]
 
-for(let r=0;r<rows;r++){
+for(let i=0;i<8;i++){
 
-for(let c=0;c<cols;c++){
-
-let index=p*perPage+r*cols+c
+let index=p*8+i
 if(index>=images.length) break
 
 let img=images[index].img
 let name=images[index].name
 
-let x=c*photoW
-let y=r*photoH
+let pos=positions[i]
 
-/* proportional crop */
+let crop=Math.min(img.width,img.height)
 
-let size=Math.min(img.width,img.height)
+let sx=(img.width-crop)/2
+let sy=(img.height-crop)/2
 
-let sx=(img.width-size)/2
-let sy=(img.height-size)/2
+/* skin smoothing + color */
+
+ctx.filter=
+`brightness(${brightness}%)
+ contrast(110%)
+ saturate(105%)
+ blur(0.4px)`
 
 ctx.drawImage(
 img,
-sx,sy,size,size,
-x,y,
+sx,sy,crop,crop,
+pos[0],pos[1],
 photoW,photoH
 )
+
+/* background whitening */
+
+if(removeBG){
+
+ctx.fillStyle="rgba(255,255,255,0.15)"
+ctx.fillRect(pos[0],pos[1],photoW,photoH)
+
+}
+
+/* learner name */
 
 if(showName){
 
 ctx.fillStyle="black"
-ctx.font="24px Arial"
+ctx.font="22px Arial"
 ctx.textAlign="center"
 
 let label=name.split(".")[0]
 
-ctx.fillText(label,x+photoW/2,y+photoH-10)
-
-}
+ctx.fillText(
+label,
+pos[0]+photoW/2,
+pos[1]+photoH-8
+)
 
 }
 
 }
 
 pages.push(canvas)
+
 document.getElementById("preview").appendChild(canvas)
 
 }
 
 }
 
-/* DOWNLOAD */
-
-function downloadPNG(){
+async function downloadPNG(){
 
 if(pages.length==0){
 alert("Generate sheets first")
 return
 }
 
-pages.forEach((c,i)=>{
+let zip=new JSZip()
 
-let a=document.createElement("a")
-a.download="passport_page_"+(i+1)+".png"
-a.href=c.toDataURL()
-a.click()
+for(let i=0;i<pages.length;i++){
 
-})
+let canvas=pages[i]
+
+let data=canvas.toDataURL("image/png")
+
+let base64=data.split(",")[1]
+
+zip.file("page_"+(i+1)+".png",base64,{base64:true})
+
+}
+
+let content=await zip.generateAsync({type:"blob"})
+
+let link=document.createElement("a")
+
+link.href=URL.createObjectURL(content)
+
+link.download="passport_pages.zip"
+
+link.click()
 
 }
 
@@ -366,18 +178,18 @@ return
 const {jsPDF}=window.jspdf
 
 let pdf=new jsPDF({
-orientation:"portrait",
+orientation:"landscape",
 unit:"px",
-format:"a4"
+format:[pageWidth,pageHeight]
 })
 
-pages.forEach((c,i)=>{
+pages.forEach((canvas,i)=>{
 
-let img=c.toDataURL("image/png")
+let img=canvas.toDataURL("image/png")
 
 if(i>0) pdf.addPage()
 
-pdf.addImage(img,"PNG",0,0)
+pdf.addImage(img,"PNG",0,0,pageWidth,pageHeight)
 
 })
 
@@ -386,6 +198,3 @@ pdf.save("passport_photos.pdf")
 }
 
 </script>
-
-</body>
-</html>
