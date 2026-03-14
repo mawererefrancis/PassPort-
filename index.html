@@ -701,14 +701,6 @@
             sWidth = Math.min(sWidth, img.width - sx);
             sHeight = Math.min(sHeight, img.height - sy);
 
-            // Optionally, if the face is still too large relative to target, we could scale down,
-            // but our generous margins should already prevent that. If the box is smaller than
-            // target, we might expand (but that would zoom in). We'll keep as is; if the box is
-            // too small, it means the face is huge, and we want a tighter crop anyway.
-            // To prevent the face from being too large, we can add a check: if the face height
-            // is more than 70% of target height, we might need to increase margins.
-            // But our margins are already generous, so it's unlikely.
-
             return { sx, sy, sWidth, sHeight };
         } catch (e) {
             console.warn('Face detection error, using fallback', e);
@@ -899,7 +891,7 @@
         }
     });
 
-    // --- Individual Photos as JPEG ZIP (high quality 0.95) ---
+    // --- Individual Photos as JPEG ZIP (maximum quality 1.0) ---
     downloadPhotosBtn.addEventListener('click', async () => {
         if (imageList.length === 0) {
             alert('Please upload photos first.');
@@ -922,7 +914,8 @@
                 for (let copy = 0; copy < dupCount; copy++) {
                     const photoCanvas = await cropToPassport(img, PHOTO_W, PHOTO_H);
                     applyFilters(photoCanvas, brightness, skinLighten, blurAmount, whiteBG);
-                    const blob = await new Promise(resolve => photoCanvas.toBlob(resolve, 'image/jpeg', 0.95));
+                    // Use maximum JPEG quality (1.0) for crystal clear output
+                    const blob = await new Promise(resolve => photoCanvas.toBlob(resolve, 'image/jpeg', 1.0));
                     zip.file(`${baseName}_copy${copy+1}.jpg`, blob);
                     if (copy % 4 === 0) await new Promise(r => setTimeout(r, 0));
                 }
@@ -932,7 +925,7 @@
                     const baseName = cleanName(imageList[idx].name);
                     const photoCanvas = await cropToPassport(img, PHOTO_W, PHOTO_H);
                     applyFilters(photoCanvas, brightness, skinLighten, blurAmount, whiteBG);
-                    const blob = await new Promise(resolve => photoCanvas.toBlob(resolve, 'image/jpeg', 0.95));
+                    const blob = await new Promise(resolve => photoCanvas.toBlob(resolve, 'image/jpeg', 1.0));
                     zip.file(`${baseName}.jpg`, blob);
 
                     if (idx % 10 === 0) await new Promise(r => setTimeout(r, 0));
