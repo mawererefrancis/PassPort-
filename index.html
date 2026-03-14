@@ -125,6 +125,28 @@
             box-shadow: 0 8px 0 #0f2542;
         }
 
+        .logout-btn {
+            background: #dc2626;
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 40px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 0 #991b1b;
+            transition: all 0.15s;
+        }
+        .logout-btn:hover {
+            background: #ef4444;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 0 #991b1b;
+        }
+        .logout-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #991b1b;
+        }
+
         .controls {
             background: white;
             border-radius: 30px;
@@ -139,7 +161,7 @@
         }
 
         .control-group {
-            min-width: 180px;
+            min-width: 160px;
             flex: 1 1 auto;
         }
 
@@ -283,7 +305,10 @@
 <div id="app">
     <div class="topbar">
         <span>🏫 School Passport Photo System</span>
-        <span class="badge">v3.0 · Memory‑optimized</span>
+        <div>
+            <span class="badge">v3.1 · Skin & Smooth</span>
+            <button class="logout-btn" id="logoutBtn">🚪 Logout</button>
+        </div>
     </div>
 
     <div class="controls">
@@ -294,6 +319,15 @@
         <div class="control-group">
             <label>🔆 Brightness</label>
             <input type="range" id="brightness" min="70" max="150" value="105">
+        </div>
+        <div class="control-group">
+            <label>✨ Skin lightening</label>
+            <input type="range" id="skinLighten" min="0" max="30" value="10" step="1">
+            <small>extra brightness</small>
+        </div>
+        <div class="control-group">
+            <label>🌀 Smoothing (blur)</label>
+            <input type="range" id="smoothBlur" min="0" max="2.0" value="0.4" step="0.1">
         </div>
         <div class="control-group">
             <label style="display: flex; align-items: center;">
@@ -328,7 +362,7 @@
     const PAGE_W = 1800;
     const PAGE_H = 1200;
     const PHOTOS_PER_PAGE = 8;
-    const PREVIEW_PAGES = 3;       // only keep these many in memory
+    const PREVIEW_PAGES = 3;
 
     const GRID = [
         [0, 0], [450, 0], [900, 0], [1350, 0],
@@ -336,7 +370,7 @@
     ];
 
     // --- State ---
-    let imageList = [];             // array of {img, name} – loaded images
+    let imageList = [];             // array of {img, name}
     let previewPages = [];          // canvases for preview (first few pages)
     let abortController = null;
 
@@ -346,8 +380,11 @@
     const userInput = document.getElementById('user');
     const passInput = document.getElementById('pass');
     const loginBtn = document.getElementById('loginBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
     const upload = document.getElementById('upload');
     const brightnessRange = document.getElementById('brightness');
+    const skinLightenRange = document.getElementById('skinLighten');
+    const smoothBlurRange = document.getElementById('smoothBlur');
     const whiteBGCB = document.getElementById('whiteBG');
     const showNameCB = document.getElementById('showName');
     const generateBtn = document.getElementById('generateBtn');
@@ -367,9 +404,21 @@
         }
     });
 
+    // --- Logout ---
+    logoutBtn.addEventListener('click', () => {
+        // Clean up resources
+        imageList.forEach(item => URL.revokeObjectURL(item.img.src));
+        imageList = [];
+        previewPages = [];
+        previewDiv.innerHTML = '';
+        upload.value = '';
+        if (abortController) abortController.abort();
+        app.style.display = 'none';
+        loginPage.style.display = 'flex';
+    });
+
     // --- Reset ---
     resetBtn.addEventListener('click', () => {
-        // Release image object URLs
         imageList.forEach(item => URL.revokeObjectURL(item.img.src));
         imageList = [];
         previewPages = [];
@@ -389,24 +438,20 @@
             return;
         }
 
-        // Abort previous generation if any
         if (abortController) abortController.abort();
         abortController = new AbortController();
         const signal = abortController.signal;
 
-        // Clear previous previews
         previewPages.forEach(c => c = null);
         previewPages = [];
         previewDiv.innerHTML = '';
 
-        // Release old image URLs
         imageList.forEach(item => URL.revokeObjectURL(item.img.src));
         imageList = [];
 
         loadingIndicator.style.display = 'flex';
 
         try {
-            // 1. Load all images
             const loadPromises = [];
             for (let file of files) {
                 if (signal.aborted) break;
@@ -417,12 +462,13 @@
 
             if (imageList.length === 0) throw new Error('No valid images');
 
-            // 2. Generate only preview pages (first few)
             const brightness = parseInt(brightnessRange.value, 10);
+            const skinLighten = parseInt(skinLightenRange.value, 10);
+            const blurAmount = parseFloat(smoothBlurRange.value);
             const whiteBG = whiteBGCB.checked;
             const showName = showNameCB.checked;
 
-            await generatePreview(imageList, brightness, whiteBG, showName, signal);
+            await generatePreview(imageList, brightness, skinLighten, blurAmount, whiteBG, showName, signal);
 
         } catch (err) {
             if (err.name !== 'AbortError') {
@@ -435,7 +481,6 @@
         }
     });
 
-    // Load one image – returns {img, name} or null
     function loadImage(file, signal) {
         return new Promise((resolve) => {
             const reader = new FileReader();
@@ -446,7 +491,6 @@
                 }
                 const img = new Image();
                 img.onload = () => {
-                    // Keep object URL for later use; we'll revoke on reset
                     resolve({ img, name: file.name });
                 };
                 img.onerror = () => {
@@ -461,30 +505,27 @@
         });
     }
 
-    // Generate only the first PREVIEW_PAGES and store in previewPages
-    async function generatePreview(images, brightness, whiteBG, showName, signal) {
+    async function generatePreview(images, brightness, skinLighten, blurAmount, whiteBG, showName, signal) {
         const totalPages = Math.ceil(images.length / PHOTOS_PER_PAGE);
         const pagesToShow = Math.min(totalPages, PREVIEW_PAGES);
 
         for (let pageIdx = 0; pageIdx < pagesToShow; pageIdx++) {
             if (signal.aborted) break;
 
-            const canvas = await renderPage(images, pageIdx, brightness, whiteBG, showName);
+            const canvas = await renderPage(images, pageIdx, brightness, skinLighten, blurAmount, whiteBG, showName);
             previewPages.push(canvas);
 
-            // Add to preview area (scaled down for display)
             const previewCanvas = canvas.cloneNode(true);
             previewCanvas.classList.add('preview-canvas');
             previewCanvas.style.width = 'min(100%, 540px)';
             previewDiv.appendChild(previewCanvas);
 
-            // Yield to keep UI responsive
             await new Promise(r => setTimeout(r, 0));
         }
     }
 
-    // Render a single page (index starting at 0) and return canvas
-    async function renderPage(images, pageIdx, brightness, whiteBG, showName) {
+    // Render a single page
+    async function renderPage(images, pageIdx, brightness, skinLighten, blurAmount, whiteBG, showName) {
         const canvas = document.createElement('canvas');
         canvas.width = PAGE_W;
         canvas.height = PAGE_H;
@@ -500,16 +541,10 @@
             const { img, name } = images[imgIndex];
             const [x, y] = GRID[i];
 
-            // Crop to passport ratio
             const photoCanvas = cropToPassport(img, PHOTO_W, PHOTO_H);
-
-            // Apply filters
-            applyFilters(photoCanvas, brightness, whiteBG);
-
-            // Draw onto page
+            applyFilters(photoCanvas, brightness, skinLighten, blurAmount, whiteBG);
             ctx.drawImage(photoCanvas, x, y, PHOTO_W, PHOTO_H);
 
-            // Optional name
             if (showName) {
                 ctx.font = 'bold 24px "Segoe UI", Arial, sans-serif';
                 ctx.fillStyle = '#1e293b';
@@ -523,7 +558,6 @@
         return canvas;
     }
 
-    // Crop image to target dimensions (center, maintain aspect)
     function cropToPassport(img, targetW, targetH) {
         const canvas = document.createElement('canvas');
         canvas.width = targetW;
@@ -532,18 +566,16 @@
 
         const sourceW = img.width;
         const sourceH = img.height;
-        const targetAR = targetW / targetH; // 0.75
+        const targetAR = targetW / targetH;
 
         let sx, sy, sWidth, sHeight;
 
         if (sourceW / sourceH > targetAR) {
-            // Image is wider: crop width
             sHeight = sourceH;
             sWidth = sourceH * targetAR;
             sx = (sourceW - sWidth) / 2;
             sy = 0;
         } else {
-            // Image is taller or equal: crop height
             sWidth = sourceW;
             sHeight = sourceW / targetAR;
             sx = 0;
@@ -554,24 +586,27 @@
         return canvas;
     }
 
-    // Apply filters for skin smoothing & whitening
-    function applyFilters(photoCanvas, brightness, whiteBG) {
+    function applyFilters(photoCanvas, brightness, skinLighten, blurAmount, whiteBG) {
         const ctx = photoCanvas.getContext('2d');
-        let filter = `brightness(${brightness}%) contrast(108%) saturate(105%) blur(0.3px)`;
+        // Base filter: brightness + skin lightening (extra brightness) + smoothing blur + slight contrast/saturation
+        const totalBrightness = brightness + skinLighten;
+        let filter = `brightness(${totalBrightness}%) contrast(108%) saturate(105%) blur(${blurAmount}px)`;
+
         if (whiteBG) {
-            filter = `brightness(${Math.min(130, brightness+10)}%) contrast(118%) saturate(102%) blur(0.3px)`;
+            // Boost whites: more contrast, push midtones up
+            filter = `brightness(${Math.min(150, totalBrightness + 10)}%) contrast(118%) saturate(102%) blur(${blurAmount}px)`;
         }
+
         ctx.filter = filter;
         ctx.drawImage(photoCanvas, 0, 0);
         ctx.filter = 'none';
     }
 
-    // Clean filename for display
     function cleanName(filename) {
         return filename.replace(/\.[^/.]+$/, "").substring(0, 20);
     }
 
-    // --- ZIP download (regenerates pages on the fly, no memory buildup) ---
+    // --- ZIP download ---
     downloadPNGBtn.addEventListener('click', async () => {
         if (imageList.length === 0) {
             alert('Please generate sheets first (or upload photos).');
@@ -580,6 +615,8 @@
 
         const totalPages = Math.ceil(imageList.length / PHOTOS_PER_PAGE);
         const brightness = parseInt(brightnessRange.value, 10);
+        const skinLighten = parseInt(skinLightenRange.value, 10);
+        const blurAmount = parseFloat(smoothBlurRange.value);
         const whiteBG = whiteBGCB.checked;
         const showName = showNameCB.checked;
 
@@ -588,16 +625,11 @@
             const zip = new JSZip();
 
             for (let pageIdx = 0; pageIdx < totalPages; pageIdx++) {
-                // Render one page
-                const canvas = await renderPage(imageList, pageIdx, brightness, whiteBG, showName);
-                // Convert to blob
+                const canvas = await renderPage(imageList, pageIdx, brightness, skinLighten, blurAmount, whiteBG, showName);
                 const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png', 0.9));
                 zip.file(`page_${pageIdx+1}.png`, blob);
-                // Free canvas
-                canvas.width = 0;
-                canvas.height = 0;
+                canvas.width = 0; canvas.height = 0;
 
-                // Update UI occasionally
                 if (pageIdx % 5 === 0) await new Promise(r => setTimeout(r, 0));
             }
 
@@ -615,7 +647,7 @@
         }
     });
 
-    // --- PDF download (regenerates pages on the fly) ---
+    // --- PDF download ---
     downloadPDFBtn.addEventListener('click', async () => {
         if (imageList.length === 0) {
             alert('Please generate sheets first (or upload photos).');
@@ -624,6 +656,8 @@
 
         const totalPages = Math.ceil(imageList.length / PHOTOS_PER_PAGE);
         const brightness = parseInt(brightnessRange.value, 10);
+        const skinLighten = parseInt(skinLightenRange.value, 10);
+        const blurAmount = parseFloat(smoothBlurRange.value);
         const whiteBG = whiteBGCB.checked;
         const showName = showNameCB.checked;
 
@@ -642,13 +676,11 @@
             for (let pageIdx = 0; pageIdx < totalPages; pageIdx++) {
                 if (pageIdx > 0) pdf.addPage();
 
-                const canvas = await renderPage(imageList, pageIdx, brightness, whiteBG, showName);
+                const canvas = await renderPage(imageList, pageIdx, brightness, skinLighten, blurAmount, whiteBG, showName);
                 const imgData = canvas.toDataURL('image/png', 0.9);
                 pdf.addImage(imgData, 'PNG', 0, 0, pdfW, pdfH, undefined, 'FAST');
 
-                // Free canvas
-                canvas.width = 0;
-                canvas.height = 0;
+                canvas.width = 0; canvas.height = 0;
 
                 if (pageIdx % 5 === 0) await new Promise(r => setTimeout(r, 0));
             }
@@ -661,7 +693,6 @@
         }
     });
 
-    // Clean up on page unload
     window.addEventListener('beforeunload', () => {
         imageList.forEach(item => URL.revokeObjectURL(item.img.src));
     });
