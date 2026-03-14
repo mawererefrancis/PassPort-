@@ -1,16 +1,215 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>School Passport Photo Studio</title>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
+<style>
+
+body{
+margin:0;
+font-family:Arial;
+background:linear-gradient(135deg,#1e90ff,#00c6ff);
+}
+
+/* LOGIN */
+
+#loginPage{
+display:flex;
+height:100vh;
+align-items:center;
+justify-content:center;
+}
+
+.loginBox{
+background:white;
+padding:30px;
+border-radius:10px;
+width:320px;
+text-align:center;
+box-shadow:0 10px 25px rgba(0,0,0,0.25);
+}
+
+.loginBox input{
+width:90%;
+padding:10px;
+margin:8px 0;
+border-radius:5px;
+border:1px solid #ccc;
+}
+
+.loginBox button{
+padding:10px 20px;
+border:none;
+background:#1e90ff;
+color:white;
+border-radius:5px;
+cursor:pointer;
+}
+
+.dev{
+margin-top:15px;
+font-size:13px;
+color:#555;
+}
+
+/* APP */
+
+#app{
+display:none;
+background:#f4f6f9;
+min-height:100vh;
+padding:20px;
+}
+
+.topbar{
+background:#2c3e50;
+color:white;
+padding:12px;
+border-radius:6px;
+margin-bottom:20px;
+}
+
+.controls{
+background:white;
+padding:15px;
+border-radius:8px;
+margin-bottom:20px;
+box-shadow:0 2px 10px rgba(0,0,0,0.1);
+}
+
+button{
+background:#1e90ff;
+color:white;
+border:none;
+padding:10px 15px;
+margin:5px;
+border-radius:5px;
+cursor:pointer;
+}
+
+button:hover{
+background:#0d6efd;
+}
+
+canvas{
+border:1px solid #ccc;
+margin:10px;
+}
+
+#preview{
+display:flex;
+flex-wrap:wrap;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<!-- LOGIN PAGE -->
+
+<div id="loginPage">
+
+<div class="loginBox">
+
+<h2>Passport Photo Studio</h2>
+
+<input id="user" placeholder="Username">
+<input id="pass" type="password" placeholder="Password">
+
+<button onclick="login()">Login</button>
+
+<div class="dev">
+Developed by <b>MAWERERE FRANCIS</b><br>
+Tel: 0788223215<br>
+WhatsApp +256788223215
+</div>
+
+</div>
+
+</div>
+
+<!-- MAIN APP -->
+
+<div id="app">
+
+<div class="topbar">
+School Passport Photo Production System
+</div>
+
+<div class="controls">
+
+Upload Photos<br>
+<input type="file" id="upload" multiple accept="image/*">
+
+<br><br>
+
+Brightness
+<br>
+<input type="range" id="brightness" min="80" max="130" value="100">
+
+<br><br>
+
+White Background
+<input type="checkbox" id="whiteBG">
+
+<br><br>
+
+Show learner name
+<input type="checkbox" id="showName">
+
+<br><br>
+
+<button onclick="generateSheets()">Generate Sheets</button>
+<button onclick="downloadPNG()">Download PNG (ZIP)</button>
+<button onclick="downloadPDF()">Download PDF</button>
+
+</div>
+
+<div id="preview"></div>
+
+</div>
+
 <script>
 
-const DPI = 300
-const photoW = 450
-const photoH = 600
+/* LOGIN */
 
-const pageWidth = 1800
-const pageHeight = 1200
+function login(){
 
-let pages = []
+let u=document.getElementById("user").value
+let p=document.getElementById("pass").value
+
+if(u==="admin" && p==="1234"){
+
+document.getElementById("loginPage").style.display="none"
+document.getElementById("app").style.display="block"
+
+}else{
+
+alert("Incorrect login")
+
+}
+
+}
+
+/* SETTINGS */
+
+const DPI=300
+const photoW=450
+const photoH=600
+
+const pageWidth=1800
+const pageHeight=1200
+
+let pages=[]
 
 function generateSheets(){
 
@@ -18,12 +217,17 @@ pages=[]
 
 const files=document.getElementById("upload").files
 const brightness=document.getElementById("brightness").value
-const removeBG=document.getElementById("removeBG")?.checked
+const whiteBG=document.getElementById("whiteBG").checked
 const showName=document.getElementById("showName").checked
 
+const preview=document.getElementById("preview")
+preview.innerHTML=""
+
 if(files.length==0){
+
 alert("Upload photos first")
 return
+
 }
 
 let images=[]
@@ -36,10 +240,13 @@ let img=new Image()
 img.onload=function(){
 
 images.push({img:img,name:file.name})
+
 loaded++
 
 if(loaded===files.length){
-processImages(images,brightness,removeBG,showName)
+
+processImages(images,brightness,whiteBG,showName)
+
 }
 
 }
@@ -50,10 +257,15 @@ img.src=URL.createObjectURL(file)
 
 }
 
-function processImages(images,brightness,removeBG,showName){
+function processImages(images,brightness,whiteBG,showName){
 
 let perPage=8
 let totalPages=Math.ceil(images.length/perPage)
+
+let positions=[
+[0,0],[450,0],[900,0],[1350,0],
+[0,600],[450,600],[900,600],[1350,600]
+]
 
 for(let p=0;p<totalPages;p++){
 
@@ -62,11 +274,6 @@ canvas.width=pageWidth
 canvas.height=pageHeight
 
 let ctx=canvas.getContext("2d")
-
-let positions=[
-[0,0],[450,0],[900,0],[1350,0],
-[0,600],[450,600],[900,600],[1350,600]
-]
 
 for(let i=0;i<8;i++){
 
@@ -83,13 +290,7 @@ let crop=Math.min(img.width,img.height)
 let sx=(img.width-crop)/2
 let sy=(img.height-crop)/2
 
-/* skin smoothing + color */
-
-ctx.filter=
-`brightness(${brightness}%)
- contrast(110%)
- saturate(105%)
- blur(0.4px)`
+ctx.filter=`brightness(${brightness}%) contrast(110%) saturate(105%) blur(0.3px)`
 
 ctx.drawImage(
 img,
@@ -98,21 +299,17 @@ pos[0],pos[1],
 photoW,photoH
 )
 
-/* background whitening */
+if(whiteBG){
 
-if(removeBG){
-
-ctx.fillStyle="rgba(255,255,255,0.15)"
+ctx.fillStyle="rgba(255,255,255,0.2)"
 ctx.fillRect(pos[0],pos[1],photoW,photoH)
 
 }
 
-/* learner name */
-
 if(showName){
 
 ctx.fillStyle="black"
-ctx.font="22px Arial"
+ctx.font="20px Arial"
 ctx.textAlign="center"
 
 let label=name.split(".")[0]
@@ -120,7 +317,7 @@ let label=name.split(".")[0]
 ctx.fillText(
 label,
 pos[0]+photoW/2,
-pos[1]+photoH-8
+pos[1]+photoH-10
 )
 
 }
@@ -135,6 +332,8 @@ document.getElementById("preview").appendChild(canvas)
 
 }
 
+/* ZIP DOWNLOAD */
+
 async function downloadPNG(){
 
 if(pages.length==0){
@@ -146,13 +345,9 @@ let zip=new JSZip()
 
 for(let i=0;i<pages.length;i++){
 
-let canvas=pages[i]
+let data=pages[i].toDataURL("image/png").split(",")[1]
 
-let data=canvas.toDataURL("image/png")
-
-let base64=data.split(",")[1]
-
-zip.file("page_"+(i+1)+".png",base64,{base64:true})
+zip.file("page_"+(i+1)+".png",data,{base64:true})
 
 }
 
@@ -161,12 +356,13 @@ let content=await zip.generateAsync({type:"blob"})
 let link=document.createElement("a")
 
 link.href=URL.createObjectURL(content)
-
 link.download="passport_pages.zip"
 
 link.click()
 
 }
+
+/* PDF */
 
 function downloadPDF(){
 
@@ -198,3 +394,6 @@ pdf.save("passport_photos.pdf")
 }
 
 </script>
+
+</body>
+</html>
