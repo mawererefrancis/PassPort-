@@ -8,6 +8,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
+        /* (Same styles as before – no changes needed) */
         * {
             box-sizing: border-box;
             margin: 0;
@@ -24,7 +25,6 @@
             margin: 0;
         }
 
-        /* LOGIN PAGE */
         #loginPage {
             width: 100%;
             max-width: 400px;
@@ -98,7 +98,6 @@
             color: #1e3c72;
         }
 
-        /* MAIN APP */
         #app {
             display: none;
             width: 100%;
@@ -472,7 +471,7 @@
             ctx.fillRect(0, 0, PAGE_W, PAGE_H);
 
             // Process each photo slot on this page
-            for let(i = 0; i < PHOTOS_PER_PAGE; i++) {
+            for (let i = 0; i < PHOTOS_PER_PAGE; i++) {   // <--- FIXED SYNTAX HERE
                 const imgIndex = pageIdx * PHOTOS_PER_PAGE + i;
                 if (imgIndex >= images.length) break;
 
