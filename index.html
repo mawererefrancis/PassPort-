@@ -3,12 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>School Passport Photo Studio · Pro</title>
-    <!-- Libraries & Font Awesome -->
+    <title>School Passport Photo Studio · AI Pro</title>
+    <!-- Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <!-- Face API (tiny model for lightweight detection) -->
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
+        /* (Same professional styles as before – unchanged) */
         * {
             box-sizing: border-box;
             margin: 0;
@@ -26,7 +30,6 @@
             position: relative;
         }
 
-        /* Professional login background with subtle pattern */
         body::before {
             content: "";
             position: absolute;
@@ -132,7 +135,6 @@
             color: #1a2b4c;
         }
 
-        /* Main App */
         #app {
             display: none;
             width: 100%;
@@ -336,11 +338,17 @@
         }
 
         @keyframes spin { to { transform: rotate(360deg); } }
+
+        .model-loading {
+            font-size: 0.9rem;
+            color: #c9a44c;
+            margin-left: 15px;
+        }
     </style>
 </head>
 <body>
 
-<!-- LOGIN PAGE (refined) -->
+<!-- LOGIN PAGE -->
 <div id="loginPage">
     <div class="loginBox">
         <div class="login-icon"><i class="fas fa-passport"></i></div>
@@ -360,7 +368,7 @@
     <div class="topbar">
         <span><i class="fas fa-school" style="margin-right: 12px;"></i>School Passport System</span>
         <div>
-            <span class="badge"><i class="fas fa-magic"></i> v3.2 · Pro</span>
+            <span class="badge"><i class="fas fa-robot"></i> AI Face Detection</span>
             <button class="logout-btn" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> Logout</button>
         </div>
     </div>
@@ -413,6 +421,7 @@
         <div id="loadingIndicator"><span class="spinner"></span> Processing ...</div>
     </div>
     <div id="preview"></div>
+    <div id="modelStatus" class="model-loading"><i class="fas fa-spinner fa-pulse"></i> Loading AI face model...</div>
 </div>
 
 <script>
@@ -436,6 +445,7 @@
     let imageList = [];             // array of {img, name}
     let previewPages = [];
     let abortController = null;
+    let faceDetectionReady = false;
 
     // --- DOM Elements ---
     const loginPage = document.getElementById('loginPage');
@@ -458,22 +468,30 @@
     const resetBtn = document.getElementById('resetBtn');
     const previewDiv = document.getElementById('preview');
     const loadingIndicator = document.getElementById('loadingIndicator');
+    const modelStatus = document.getElementById('modelStatus');
 
-    // --- Helper: determine effective duplicate count based on files ---
+    // --- Load face detection model on startup ---
+    async function loadFaceModel() {
+        try {
+            modelStatus.style.display = 'block';
+            await faceapi.nets.tinyFaceDetector.loadFromUri('https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights');
+            // Also load the face landmark model? Not needed for simple detection.
+            faceDetectionReady = true;
+            modelStatus.innerHTML = '<i class="fas fa-check-circle" style="color:#2ecc71;"></i> AI face model ready';
+        } catch (err) {
+            console.warn('Face model failed to load, using center crop fallback.', err);
+            modelStatus.innerHTML = '<i class="fas fa-exclamation-triangle" style="color:#e67e22;"></i> Face model unavailable, using center crop';
+            faceDetectionReady = false;
+        }
+    }
+    loadFaceModel();
+
+    // --- Helper: effective duplicate count ---
     function getEffectiveDupCount() {
         if (imageList.length === 1) {
             return parseInt(dupSelect.value, 10);
         }
-        return 1; // no dup if multiple photos
-    }
-
-    // --- Helper: get image for a given slot considering duplicates ---
-    function getImageForSlot(slotIndex, pageOffset = 0) {
-        // pageOffset unused here because we only generate one page for dup mode,
-        // but for multiple pages we need global index. We'll handle in renderPage.
-        // Instead, we'll pass dupCount to renderPage and handle there.
-        // This function is kept for clarity.
-        return null; // not used directly
+        return 1;
     }
 
     // --- Login ---
@@ -588,7 +606,6 @@
     }
 
     async function generatePreview(images, brightness, skinLighten, blurAmount, whiteBG, showName, dupCount, signal) {
-        // For preview, we only need first few pages. In dup mode with one image, total pages = 1.
         let totalPages;
         if (dupCount > 1 && images.length === 1) {
             totalPages = 1;
@@ -612,86 +629,93 @@
         }
     }
 
-    // Render a single page (with duplication support)
-    async function renderPage(images, pageIdx, brightness, skinLighten, blurAmount, whiteBG, showName, dupCount = 1) {
-        const canvas = document.createElement('canvas');
-        canvas.width = PAGE_W;
-        canvas.height = PAGE_H;
-        const ctx = canvas.getContext('2d', { alpha: false });
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, PAGE_W, PAGE_H);
-
-        const isDupMode = (dupCount > 1 && images.length === 1);
-        const singleImage = isDupMode ? images[0] : null;
-
-        // Determine how many slots to fill on this page
-        let slotsToFill = PHOTOS_PER_PAGE;
-        if (isDupMode && pageIdx === 0) {
-            slotsToFill = dupCount; // only fill requested copies on first page
-        } else if (!isDupMode) {
-            // normal mode: fill based on images left
-            const startIdx = pageIdx * PHOTOS_PER_PAGE;
-            slotsToFill = Math.min(PHOTOS_PER_PAGE, images.length - startIdx);
-        } else {
-            // dup mode but beyond first page: no images (should not happen as totalPages=1)
-            slotsToFill = 0;
-        }
-
-        for (let i = 0; i < slotsToFill; i++) {
-            let img, name;
-            if (isDupMode) {
-                img = singleImage.img;
-                name = singleImage.name + (dupCount > 1 ? `_copy${i+1}` : '');
+    // --- AI‑powered crop: detect face and adjust source rectangle ---
+    async function getFaceCropRect(img, targetW, targetH) {
+        // Fallback: center crop
+        const fallback = () => {
+            const sourceW = img.width;
+            const sourceH = img.height;
+            const targetAR = targetW / targetH; // 0.75
+            if (sourceW / sourceH > targetAR) {
+                // wider: crop width
+                const sHeight = sourceH;
+                const sWidth = sourceH * targetAR;
+                const sx = (sourceW - sWidth) / 2;
+                return { sx, sy: 0, sWidth, sHeight };
             } else {
-                const idx = pageIdx * PHOTOS_PER_PAGE + i;
-                if (idx >= images.length) break;
-                img = images[idx].img;
-                name = images[idx].name;
+                // taller: crop height
+                const sWidth = sourceW;
+                const sHeight = sourceW / targetAR;
+                const sy = (sourceH - sHeight) / 2;
+                return { sx: 0, sy, sWidth, sHeight };
+            }
+        };
+
+        if (!faceDetectionReady) return fallback();
+
+        try {
+            // Detect faces
+            const detections = await faceapi.detectAllFaces(img, new faceapi.TinyFaceDetectorOptions());
+            if (!detections || detections.length === 0) {
+                return fallback();
             }
 
-            const [x, y] = GRID[i];
+            // Use the largest face (by area)
+            const face = detections.reduce((largest, curr) => {
+                const area = curr.box.width * curr.box.height;
+                return area > (largest?.area || 0) ? { box: curr.box, area } : largest;
+            }, null).box;
 
-            const photoCanvas = cropToPassport(img, PHOTO_W, PHOTO_H);
-            applyFilters(photoCanvas, brightness, skinLighten, blurAmount, whiteBG);
-            ctx.drawImage(photoCanvas, x, y, PHOTO_W, PHOTO_H);
+            // Expand box to include some margin: 30% above top, 15% below bottom, and ensure it fits within image
+            const marginTop = face.height * 0.3;
+            const marginBottom = face.height * 0.15;
+            const marginSides = face.width * 0.1; // small side margin
 
-            if (showName) {
-                ctx.font = 'bold 24px "Segoe UI", Arial, sans-serif';
-                ctx.fillStyle = '#1e293b';
-                ctx.textAlign = 'center';
-                ctx.shadowColor = 'white';
-                ctx.shadowBlur = 6;
-                ctx.fillText(cleanName(name), x + PHOTO_W/2, y + PHOTO_H - 20);
-                ctx.shadowColor = 'transparent';
+            let top = Math.max(0, face.y - marginTop);
+            let bottom = Math.min(img.height, face.y + face.height + marginBottom);
+            let left = Math.max(0, face.x - marginSides);
+            let right = Math.min(img.width, face.x + face.width + marginSides);
+
+            // Now we have a box that contains the face with margins. We need to crop to targetAR.
+            const boxW = right - left;
+            const boxH = bottom - top;
+            const targetAR = targetW / targetH;
+
+            let sx, sy, sWidth, sHeight;
+            if (boxW / boxH > targetAR) {
+                // Current box is wider than target: crop width
+                sHeight = boxH;
+                sWidth = boxH * targetAR;
+                sx = left + (boxW - sWidth) / 2;
+                sy = top;
+            } else {
+                // Box is taller: crop height
+                sWidth = boxW;
+                sHeight = boxW / targetAR;
+                sx = left;
+                sy = top + (boxH - sHeight) / 2;
             }
+
+            // Ensure source rectangle is within image bounds
+            sx = Math.max(0, Math.min(sx, img.width - sWidth));
+            sy = Math.max(0, Math.min(sy, img.height - sHeight));
+            sWidth = Math.min(sWidth, img.width - sx);
+            sHeight = Math.min(sHeight, img.height - sy);
+
+            return { sx, sy, sWidth, sHeight };
+        } catch (e) {
+            console.warn('Face detection error, using fallback', e);
+            return fallback();
         }
-        return canvas;
     }
 
-    function cropToPassport(img, targetW, targetH) {
+    // --- Crop function now async ---
+    async function cropToPassport(img, targetW, targetH) {
+        const { sx, sy, sWidth, sHeight } = await getFaceCropRect(img, targetW, targetH);
         const canvas = document.createElement('canvas');
         canvas.width = targetW;
         canvas.height = targetH;
         const ctx = canvas.getContext('2d');
-
-        const sourceW = img.width;
-        const sourceH = img.height;
-        const targetAR = targetW / targetH;
-
-        let sx, sy, sWidth, sHeight;
-
-        if (sourceW / sourceH > targetAR) {
-            sHeight = sourceH;
-            sWidth = sourceH * targetAR;
-            sx = (sourceW - sWidth) / 2;
-            sy = 0;
-        } else {
-            sWidth = sourceW;
-            sHeight = sourceW / targetAR;
-            sx = 0;
-            sy = (sourceH - sHeight) / 2;
-        }
-
         ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, targetW, targetH);
         return canvas;
     }
@@ -712,6 +736,59 @@
 
     function cleanName(filename) {
         return filename.replace(/\.[^/.]+$/, "").substring(0, 20);
+    }
+
+    // --- Render a page (now awaits crop) ---
+    async function renderPage(images, pageIdx, brightness, skinLighten, blurAmount, whiteBG, showName, dupCount = 1) {
+        const canvas = document.createElement('canvas');
+        canvas.width = PAGE_W;
+        canvas.height = PAGE_H;
+        const ctx = canvas.getContext('2d', { alpha: false });
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, PAGE_W, PAGE_H);
+
+        const isDupMode = (dupCount > 1 && images.length === 1);
+        const singleImage = isDupMode ? images[0] : null;
+
+        let slotsToFill = PHOTOS_PER_PAGE;
+        if (isDupMode && pageIdx === 0) {
+            slotsToFill = dupCount;
+        } else if (!isDupMode) {
+            const startIdx = pageIdx * PHOTOS_PER_PAGE;
+            slotsToFill = Math.min(PHOTOS_PER_PAGE, images.length - startIdx);
+        } else {
+            slotsToFill = 0;
+        }
+
+        for (let i = 0; i < slotsToFill; i++) {
+            let img, name;
+            if (isDupMode) {
+                img = singleImage.img;
+                name = singleImage.name + (dupCount > 1 ? `_copy${i+1}` : '');
+            } else {
+                const idx = pageIdx * PHOTOS_PER_PAGE + i;
+                if (idx >= images.length) break;
+                img = images[idx].img;
+                name = images[idx].name;
+            }
+
+            const [x, y] = GRID[i];
+
+            const photoCanvas = await cropToPassport(img, PHOTO_W, PHOTO_H);
+            applyFilters(photoCanvas, brightness, skinLighten, blurAmount, whiteBG);
+            ctx.drawImage(photoCanvas, x, y, PHOTO_W, PHOTO_H);
+
+            if (showName) {
+                ctx.font = 'bold 24px "Segoe UI", Arial, sans-serif';
+                ctx.fillStyle = '#1e293b';
+                ctx.textAlign = 'center';
+                ctx.shadowColor = 'white';
+                ctx.shadowBlur = 6;
+                ctx.fillText(cleanName(name), x + PHOTO_W/2, y + PHOTO_H - 20);
+                ctx.shadowColor = 'transparent';
+            }
+        }
+        return canvas;
     }
 
     // --- ZIP download (PNG sheets) ---
@@ -815,7 +892,7 @@
         }
     });
 
-    // --- Individual Photos as JPEG ZIP ---
+    // --- Individual Photos as JPEG ZIP (high quality 0.95) ---
     downloadPhotosBtn.addEventListener('click', async () => {
         if (imageList.length === 0) {
             alert('Please upload photos first.');
@@ -833,23 +910,22 @@
             const zip = new JSZip();
 
             if (dupCount > 1 && imageList.length === 1) {
-                // Duplicate mode: generate N copies
                 const img = imageList[0].img;
                 const baseName = cleanName(imageList[0].name);
                 for (let copy = 0; copy < dupCount; copy++) {
-                    const photoCanvas = cropToPassport(img, PHOTO_W, PHOTO_H);
+                    const photoCanvas = await cropToPassport(img, PHOTO_W, PHOTO_H);
                     applyFilters(photoCanvas, brightness, skinLighten, blurAmount, whiteBG);
-                    const blob = await new Promise(resolve => photoCanvas.toBlob(resolve, 'image/jpeg', 0.92));
+                    const blob = await new Promise(resolve => photoCanvas.toBlob(resolve, 'image/jpeg', 0.95));
                     zip.file(`${baseName}_copy${copy+1}.jpg`, blob);
+                    if (copy % 4 === 0) await new Promise(r => setTimeout(r, 0));
                 }
             } else {
-                // Normal mode: one per image
                 for (let idx = 0; idx < imageList.length; idx++) {
                     const img = imageList[idx].img;
                     const baseName = cleanName(imageList[idx].name);
-                    const photoCanvas = cropToPassport(img, PHOTO_W, PHOTO_H);
+                    const photoCanvas = await cropToPassport(img, PHOTO_W, PHOTO_H);
                     applyFilters(photoCanvas, brightness, skinLighten, blurAmount, whiteBG);
-                    const blob = await new Promise(resolve => photoCanvas.toBlob(resolve, 'image/jpeg', 0.92));
+                    const blob = await new Promise(resolve => photoCanvas.toBlob(resolve, 'image/jpeg', 0.95));
                     zip.file(`${baseName}.jpg`, blob);
 
                     if (idx % 10 === 0) await new Promise(r => setTimeout(r, 0));
