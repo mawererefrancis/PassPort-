@@ -12,7 +12,7 @@
     <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
-        /* (Same professional styles as before – unchanged) */
+        /* (Same professional styles – unchanged) */
         * {
             box-sizing: border-box;
             margin: 0;
@@ -475,7 +475,6 @@
         try {
             modelStatus.style.display = 'block';
             await faceapi.nets.tinyFaceDetector.loadFromUri('https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights');
-            // Also load the face landmark model? Not needed for simple detection.
             faceDetectionReady = true;
             modelStatus.innerHTML = '<i class="fas fa-check-circle" style="color:#2ecc71;"></i> AI face model ready';
         } catch (err) {
@@ -629,7 +628,7 @@
         }
     }
 
-    // --- AI‑powered crop: detect face and adjust source rectangle ---
+    // --- AI‑powered crop: detect face and adjust source rectangle (generous margins) ---
     async function getFaceCropRect(img, targetW, targetH) {
         // Fallback: center crop
         const fallback = () => {
@@ -666,30 +665,30 @@
                 return area > (largest?.area || 0) ? { box: curr.box, area } : largest;
             }, null).box;
 
-            // Expand box to include some margin: 30% above top, 15% below bottom, and ensure it fits within image
-            const marginTop = face.height * 0.3;
-            const marginBottom = face.height * 0.15;
-            const marginSides = face.width * 0.1; // small side margin
+            // Generous margins (to include shoulders and headroom)
+            const marginTop = face.height * 0.8;      // 80% above the face top
+            const marginBottom = face.height * 0.5;   // 50% below the face bottom
+            const marginSides = face.width * 0.3;     // 30% on each side
 
             let top = Math.max(0, face.y - marginTop);
             let bottom = Math.min(img.height, face.y + face.height + marginBottom);
             let left = Math.max(0, face.x - marginSides);
             let right = Math.min(img.width, face.x + face.width + marginSides);
 
-            // Now we have a box that contains the face with margins. We need to crop to targetAR.
+            // Now we have a box that contains the face with generous margins. Ensure it's at least as large as target aspect ratio.
             const boxW = right - left;
             const boxH = bottom - top;
             const targetAR = targetW / targetH;
 
             let sx, sy, sWidth, sHeight;
             if (boxW / boxH > targetAR) {
-                // Current box is wider than target: crop width
+                // Current box is wider than target: crop width (keep height)
                 sHeight = boxH;
                 sWidth = boxH * targetAR;
                 sx = left + (boxW - sWidth) / 2;
                 sy = top;
             } else {
-                // Box is taller: crop height
+                // Box is taller: crop height (keep width)
                 sWidth = boxW;
                 sHeight = boxW / targetAR;
                 sx = left;
@@ -701,6 +700,14 @@
             sy = Math.max(0, Math.min(sy, img.height - sHeight));
             sWidth = Math.min(sWidth, img.width - sx);
             sHeight = Math.min(sHeight, img.height - sy);
+
+            // Optionally, if the face is still too large relative to target, we could scale down,
+            // but our generous margins should already prevent that. If the box is smaller than
+            // target, we might expand (but that would zoom in). We'll keep as is; if the box is
+            // too small, it means the face is huge, and we want a tighter crop anyway.
+            // To prevent the face from being too large, we can add a check: if the face height
+            // is more than 70% of target height, we might need to increase margins.
+            // But our margins are already generous, so it's unlikely.
 
             return { sx, sy, sWidth, sHeight };
         } catch (e) {
