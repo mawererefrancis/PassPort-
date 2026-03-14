@@ -2,18 +2,15 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>School Passport Photo Studio</title>
+<title>School Passport Photo Maker</title>
 
-<script src="https://cdn.jsdelivr.net/npm/face-api.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
 
 body{
 font-family:Arial;
-background:#f4f4f4;
+background:#f2f2f2;
 padding:20px;
 }
 
@@ -23,14 +20,9 @@ text-align:center;
 
 .controls{
 background:white;
-padding:15px;
-border-radius:6px;
+padding:20px;
+border-radius:8px;
 margin-bottom:20px;
-}
-
-canvas{
-border:1px solid #ccc;
-margin:10px;
 }
 
 button{
@@ -39,12 +31,18 @@ margin-top:10px;
 cursor:pointer;
 }
 
+canvas{
+border:1px solid #ccc;
+margin:10px;
+}
+
 </style>
+
 </head>
 
 <body>
 
-<h2>School Passport Photo Studio</h2>
+<h2>School Passport Photo Sheet Maker</h2>
 
 <div class="controls">
 
@@ -54,9 +52,9 @@ Upload Photos
 
 <br><br>
 
-Duplicates (if single photo)
+Duplicates (if one photo)
 <br>
-<input type="number" id="duplicates" value="8">
+<input type="number" id="duplicates" value="8" min="1">
 
 <br><br>
 
@@ -66,12 +64,7 @@ Brightness
 
 <br><br>
 
-<input type="checkbox" id="removeBG">
-Remove Background (White)
-
-<br><br>
-
-<button onclick="generate()">Generate Sheets</button>
+<button onclick="generateSheets()">Generate Sheets</button>
 <button onclick="downloadPNG()">Download PNG</button>
 <button onclick="downloadPDF()">Download PDF</button>
 
@@ -81,95 +74,67 @@ Remove Background (White)
 
 <script>
 
-const DPI=300
+const DPI = 300
 
-const pageWidth=6*DPI
-const pageHeight=4*DPI
+const pageWidth = 6 * DPI
+const pageHeight = 4 * DPI
 
-const photoW=1.5*DPI
-const photoH=2*DPI
+const photoWidth = 1.5 * DPI
+const photoHeight = 2 * DPI
 
 let pages=[]
 
-async function generate(){
+function generateSheets(){
+
+pages=[]
 
 const files=document.getElementById("upload").files
-const dup=parseInt(document.getElementById("duplicates").value)
+const duplicates=parseInt(document.getElementById("duplicates").value)
 const brightness=document.getElementById("brightness").value
-const removeBG=document.getElementById("removeBG").checked
 
 const preview=document.getElementById("preview")
 preview.innerHTML=""
 
-if(files.length==0){
-alert("Upload photos")
+if(files.length===0){
+alert("Please upload photos")
 return
 }
 
-await faceapi.nets.tinyFaceDetector.loadFromUri(
-"https://cdn.jsdelivr.net/npm/face-api.js/weights"
-)
-
 let images=[]
+let loaded=0
 
 for(let file of files){
 
 let img=new Image()
+
+img.onload=function(){
+
+images.push(img)
+loaded++
+
+if(loaded===files.length){
+
+processImages(images,duplicates,brightness)
+
+}
+
+}
+
 img.src=URL.createObjectURL(file)
 
-await new Promise(r=>img.onload=r)
-
-let canvas=document.createElement("canvas")
-canvas.width=photoW
-canvas.height=photoH
-
-let ctx=canvas.getContext("2d")
-
-ctx.filter=`brightness(${brightness}%)`
-
-let face=await faceapi.detectSingleFace(
-img,
-new faceapi.TinyFaceDetectorOptions()
-)
-
-if(face){
-
-let box=face.box
-
-ctx.drawImage(
-img,
-box.x,
-box.y,
-box.width,
-box.height,
-0,
-0,
-photoW,
-photoH
-)
-
-}else{
-
-ctx.drawImage(img,0,0,photoW,photoH)
+}
 
 }
 
-smooth(ctx)
-
-if(removeBG){
-await removeBackground(canvas)
-}
-
-images.push(canvas)
-
-}
+function processImages(images,duplicates,brightness){
 
 let photoList=[]
 
-if(images.length==1){
+if(images.length===1){
 
-for(let i=0;i<dup;i++)
+for(let i=0;i<duplicates;i++){
 photoList.push(images[0])
+}
 
 }else{
 
@@ -177,53 +142,10 @@ photoList=images
 
 }
 
-buildPages(photoList)
-
-}
-
-function smooth(ctx){
-
-ctx.globalAlpha=0.95
-ctx.filter+=" contrast(105%)"
-
-}
-
-async function removeBackground(canvas){
-
-const net=await bodyPix.load()
-
-const segmentation=await net.segmentPerson(canvas)
-
-const ctx=canvas.getContext("2d")
-const imgData=ctx.getImageData(0,0,canvas.width,canvas.height)
-
-for(let i=0;i<segmentation.data.length;i++){
-
-if(segmentation.data[i]==0){
-
-imgData.data[i*4]=255
-imgData.data[i*4+1]=255
-imgData.data[i*4+2]=255
-
-}
-
-}
-
-ctx.putImageData(imgData,0,0)
-
-}
-
-function buildPages(list){
-
-pages=[]
-
-const preview=document.getElementById("preview")
-
 let perPage=8
+let totalPages=Math.ceil(photoList.length/perPage)
 
-let total=Math.ceil(list.length/perPage)
-
-for(let p=0;p<total;p++){
+for(let p=0;p<totalPages;p++){
 
 let canvas=document.createElement("canvas")
 canvas.width=pageWidth
@@ -231,7 +153,9 @@ canvas.height=pageHeight
 
 let ctx=canvas.getContext("2d")
 
-let pos=[
+ctx.filter="brightness("+brightness+"%) contrast(105%)"
+
+let positions=[
 [0,0],[450,0],[900,0],[1350,0],
 [0,600],[450,600],[900,600],[1350,600]
 ]
@@ -239,21 +163,26 @@ let pos=[
 for(let i=0;i<8;i++){
 
 let index=p*8+i
+if(index>=photoList.length) break
 
-if(index>=list.length) break
+let img=photoList[index]
 
 ctx.drawImage(
-list[index],
-pos[i][0],
-pos[i][1],
-photoW,
-photoH
+img,
+0,
+0,
+img.width,
+img.height,
+positions[i][0],
+positions[i][1],
+photoWidth,
+photoHeight
 )
 
 }
 
 pages.push(canvas)
-preview.appendChild(canvas)
+document.getElementById("preview").appendChild(canvas)
 
 }
 
@@ -261,20 +190,30 @@ preview.appendChild(canvas)
 
 function downloadPNG(){
 
+if(pages.length===0){
+alert("Generate sheets first")
+return
+}
+
 pages.forEach((canvas,i)=>{
 
-let a=document.createElement("a")
+let link=document.createElement("a")
 
-a.download="passport_page_"+(i+1)+".png"
-a.href=canvas.toDataURL()
+link.download="passport_page_"+(i+1)+".png"
+link.href=canvas.toDataURL("image/png")
 
-a.click()
+link.click()
 
 })
 
 }
 
 function downloadPDF(){
+
+if(pages.length===0){
+alert("Generate sheets first")
+return
+}
 
 const {jsPDF}=window.jspdf
 
