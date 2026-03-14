@@ -1,399 +1,647 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>School Passport Photo Studio · Pro</title>
+    <!-- Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
 
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+        body {
+            font-family: 'Segoe UI', Roboto, system-ui, sans-serif;
+            background: linear-gradient(145deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+        }
 
-<title>School Passport Photo Studio</title>
+        /* LOGIN PAGE */
+        #loginPage {
+            width: 100%;
+            max-width: 400px;
+            padding: 20px;
+        }
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+        .loginBox {
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(8px);
+            padding: 2.5rem 2rem;
+            border-radius: 32px;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.3);
+        }
 
-<style>
+        .loginBox h2 {
+            font-weight: 600;
+            color: #1e3c72;
+            margin-bottom: 1.8rem;
+            font-size: 2rem;
+            letter-spacing: -0.5px;
+        }
 
-body{
-margin:0;
-font-family:Arial;
-background:linear-gradient(135deg,#1e90ff,#00c6ff);
-}
+        .loginBox input {
+            width: 100%;
+            padding: 14px 18px;
+            margin: 10px 0;
+            border: 2px solid #e9eef2;
+            border-radius: 60px;
+            font-size: 1rem;
+            transition: 0.2s;
+            outline: none;
+            background: white;
+        }
 
-/* LOGIN */
+        .loginBox input:focus {
+            border-color: #2a5298;
+            box-shadow: 0 0 0 3px rgba(42,82,152,0.2);
+        }
 
-#loginPage{
-display:flex;
-height:100vh;
-align-items:center;
-justify-content:center;
-}
+        .loginBox button {
+            background: #1e3c72;
+            color: white;
+            border: none;
+            padding: 14px 30px;
+            font-size: 1.2rem;
+            font-weight: 600;
+            border-radius: 60px;
+            width: 100%;
+            margin: 20px 0 15px;
+            cursor: pointer;
+            transition: 0.2s;
+            letter-spacing: 0.5px;
+        }
 
-.loginBox{
-background:white;
-padding:30px;
-border-radius:10px;
-width:320px;
-text-align:center;
-box-shadow:0 10px 25px rgba(0,0,0,0.25);
-}
+        .loginBox button:hover {
+            background: #2a5298;
+            transform: scale(1.02);
+        }
 
-.loginBox input{
-width:90%;
-padding:10px;
-margin:8px 0;
-border-radius:5px;
-border:1px solid #ccc;
-}
+        .dev {
+            margin-top: 25px;
+            font-size: 0.9rem;
+            color: #4a5568;
+            border-top: 1px dashed #cbd5e0;
+            padding-top: 20px;
+        }
 
-.loginBox button{
-padding:10px 20px;
-border:none;
-background:#1e90ff;
-color:white;
-border-radius:5px;
-cursor:pointer;
-}
+        .dev b {
+            color: #1e3c72;
+        }
 
-.dev{
-margin-top:15px;
-font-size:13px;
-color:#555;
-}
+        /* MAIN APP */
+        #app {
+            display: none;
+            width: 100%;
+            max-width: 1600px;
+            margin: 20px;
+            background: #f8fafc;
+            border-radius: 40px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.3);
+            padding: 30px;
+            backdrop-filter: blur(2px);
+        }
 
-/* APP */
+        .topbar {
+            background: #1e3c72;
+            color: white;
+            padding: 22px 28px;
+            border-radius: 30px;
+            font-size: 1.8rem;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+            margin-bottom: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 8px 0 #0f2542;
+        }
 
-#app{
-display:none;
-background:#f4f6f9;
-min-height:100vh;
-padding:20px;
-}
+        .controls {
+            background: white;
+            border-radius: 30px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 15px 30px -12px rgba(0,0,0,0.2);
+            border: 1px solid #e2e8f0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 25px;
+            align-items: flex-end;
+        }
 
-.topbar{
-background:#2c3e50;
-color:white;
-padding:12px;
-border-radius:6px;
-margin-bottom:20px;
-}
+        .control-group {
+            min-width: 180px;
+            flex: 1 1 auto;
+        }
 
-.controls{
-background:white;
-padding:15px;
-border-radius:8px;
-margin-bottom:20px;
-box-shadow:0 2px 10px rgba(0,0,0,0.1);
-}
+        .control-group label {
+            display: block;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
 
-button{
-background:#1e90ff;
-color:white;
-border:none;
-padding:10px 15px;
-margin:5px;
-border-radius:5px;
-cursor:pointer;
-}
+        .control-group input[type="file"] {
+            padding: 10px 0;
+            width: 100%;
+        }
 
-button:hover{
-background:#0d6efd;
-}
+        .control-group input[type="range"] {
+            width: 100%;
+            margin: 5px 0;
+        }
 
-canvas{
-border:1px solid #ccc;
-margin:10px;
-}
+        .control-group input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
 
-#preview{
-display:flex;
-flex-wrap:wrap;
-}
+        .btn {
+            background: #1e3c72;
+            border: none;
+            color: white;
+            font-weight: 600;
+            padding: 14px 28px;
+            border-radius: 40px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.15s;
+            box-shadow: 0 5px 0 #0f2542;
+            border: 1px solid #2d4b7c;
+            margin: 0 5px 5px 0;
+        }
 
-</style>
+        .btn:hover {
+            background: #2a5298;
+            transform: translateY(-2px);
+            box-shadow: 0 7px 0 #0f2542;
+        }
 
+        .btn:active {
+            transform: translateY(5px);
+            box-shadow: 0 2px 0 #0f2542;
+        }
+
+        .btn.secondary {
+            background: #475569;
+            box-shadow: 0 5px 0 #1e293b;
+            border-color: #334155;
+        }
+
+        .preview-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .preview-header h3 {
+            color: #1e293b;
+            font-weight: 600;
+        }
+
+        #preview {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            background: #e9eef2;
+            border-radius: 40px;
+            padding: 30px;
+            min-height: 300px;
+            border: 2px dashed #94a3b8;
+        }
+
+        .preview-canvas {
+            border-radius: 24px;
+            box-shadow: 0 12px 25px -8px rgba(0,0,0,0.4);
+            border: 4px solid white;
+            max-width: 100%;
+            height: auto;
+        }
+
+        .badge {
+            background: #2a5298;
+            color: white;
+            padding: 6px 14px;
+            border-radius: 40px;
+            font-size: 0.85rem;
+        }
+
+        #loadingIndicator {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            color: #1e3c72;
+            font-weight: 600;
+        }
+
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 4px solid #cbd5e1;
+            border-top-color: #1e3c72;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
 </head>
-
 <body>
 
 <!-- LOGIN PAGE -->
-
 <div id="loginPage">
-
-<div class="loginBox">
-
-<h2>Passport Photo Studio</h2>
-
-<input id="user" placeholder="Username">
-<input id="pass" type="password" placeholder="Password">
-
-<button onclick="login()">Login</button>
-
-<div class="dev">
-Developed by <b>MAWERERE FRANCIS</b><br>
-Tel: 0788223215<br>
-WhatsApp +256788223215
-</div>
-
-</div>
-
+    <div class="loginBox">
+        <h2>📸 Passport Studio</h2>
+        <input type="text" id="user" placeholder="Username" value="admin">
+        <input type="password" id="pass" placeholder="Password" value="1234">
+        <button id="loginBtn">Login →</button>
+        <div class="dev">
+            Developed by <b>MAWERERE FRANCIS</b><br>
+            📞 0788223215 · 📱 +256788223215
+        </div>
+    </div>
 </div>
 
 <!-- MAIN APP -->
-
 <div id="app">
+    <div class="topbar">
+        <span>🏫 School Passport Photo System</span>
+        <span class="badge">v2.0 · 300 DPI</span>
+    </div>
 
-<div class="topbar">
-School Passport Photo Production System
-</div>
+    <div class="controls">
+        <div class="control-group" style="flex:2">
+            <label>📁 Upload photos (JPEG/PNG)</label>
+            <input type="file" id="upload" multiple accept="image/*">
+        </div>
+        <div class="control-group">
+            <label>🔆 Brightness</label>
+            <input type="range" id="brightness" min="70" max="150" value="105">
+        </div>
+        <div class="control-group">
+            <label style="display: flex; align-items: center;">
+                <input type="checkbox" id="whiteBG"> ⚪ White background boost
+            </label>
+            <label style="display: flex; align-items: center;">
+                <input type="checkbox" id="showName"> 🏷️ Show file name
+            </label>
+        </div>
+        <div style="display: flex; gap: 5px; flex-wrap: wrap; margin-left: auto;">
+            <button class="btn" id="generateBtn">✨ Generate sheets</button>
+            <button class="btn" id="downloadPNGBtn">📦 PNG (ZIP)</button>
+            <button class="btn" id="downloadPDFBtn">📄 PDF</button>
+            <button class="btn secondary" id="resetBtn">↻ Reset</button>
+        </div>
+    </div>
 
-<div class="controls">
-
-Upload Photos<br>
-<input type="file" id="upload" multiple accept="image/*">
-
-<br><br>
-
-Brightness
-<br>
-<input type="range" id="brightness" min="80" max="130" value="100">
-
-<br><br>
-
-White Background
-<input type="checkbox" id="whiteBG">
-
-<br><br>
-
-Show learner name
-<input type="checkbox" id="showName">
-
-<br><br>
-
-<button onclick="generateSheets()">Generate Sheets</button>
-<button onclick="downloadPNG()">Download PNG (ZIP)</button>
-<button onclick="downloadPDF()">Download PDF</button>
-
-</div>
-
-<div id="preview"></div>
-
+    <div class="preview-header">
+        <h3>📋 Preview (first 3 sheets)</h3>
+        <div id="loadingIndicator"><span class="spinner"></span> Processing ...</div>
+    </div>
+    <div id="preview"></div>
 </div>
 
 <script>
-
-/* LOGIN */
-
-function login(){
-
-let u=document.getElementById("user").value
-let p=document.getElementById("pass").value
-
-if(u==="admin" && p==="1234"){
-
-document.getElementById("loginPage").style.display="none"
-document.getElementById("app").style.display="block"
-
-}else{
-
-alert("Incorrect login")
-
-}
-
-}
-
-/* SETTINGS */
-
-const DPI=300
-const photoW=450
-const photoH=600
-
-const pageWidth=1800
-const pageHeight=1200
-
-let pages=[]
-
-function generateSheets(){
-
-pages=[]
-
-const files=document.getElementById("upload").files
-const brightness=document.getElementById("brightness").value
-const whiteBG=document.getElementById("whiteBG").checked
-const showName=document.getElementById("showName").checked
-
-const preview=document.getElementById("preview")
-preview.innerHTML=""
-
-if(files.length==0){
-
-alert("Upload photos first")
-return
-
-}
-
-let images=[]
-let loaded=0
-
-for(let file of files){
-
-let img=new Image()
-
-img.onload=function(){
-
-images.push({img:img,name:file.name})
-
-loaded++
-
-if(loaded===files.length){
-
-processImages(images,brightness,whiteBG,showName)
-
-}
-
-}
-
-img.src=URL.createObjectURL(file)
-
-}
-
-}
-
-function processImages(images,brightness,whiteBG,showName){
-
-let perPage=8
-let totalPages=Math.ceil(images.length/perPage)
-
-let positions=[
-[0,0],[450,0],[900,0],[1350,0],
-[0,600],[450,600],[900,600],[1350,600]
-]
-
-for(let p=0;p<totalPages;p++){
-
-let canvas=document.createElement("canvas")
-canvas.width=pageWidth
-canvas.height=pageHeight
-
-let ctx=canvas.getContext("2d")
-
-for(let i=0;i<8;i++){
-
-let index=p*8+i
-if(index>=images.length) break
-
-let img=images[index].img
-let name=images[index].name
-
-let pos=positions[i]
-
-let crop=Math.min(img.width,img.height)
-
-let sx=(img.width-crop)/2
-let sy=(img.height-crop)/2
-
-ctx.filter=`brightness(${brightness}%) contrast(110%) saturate(105%) blur(0.3px)`
-
-ctx.drawImage(
-img,
-sx,sy,crop,crop,
-pos[0],pos[1],
-photoW,photoH
-)
-
-if(whiteBG){
-
-ctx.fillStyle="rgba(255,255,255,0.2)"
-ctx.fillRect(pos[0],pos[1],photoW,photoH)
-
-}
-
-if(showName){
-
-ctx.fillStyle="black"
-ctx.font="20px Arial"
-ctx.textAlign="center"
-
-let label=name.split(".")[0]
-
-ctx.fillText(
-label,
-pos[0]+photoW/2,
-pos[1]+photoH-10
-)
-
-}
-
-}
-
-pages.push(canvas)
-
-document.getElementById("preview").appendChild(canvas)
-
-}
-
-}
-
-/* ZIP DOWNLOAD */
-
-async function downloadPNG(){
-
-if(pages.length==0){
-alert("Generate sheets first")
-return
-}
-
-let zip=new JSZip()
-
-for(let i=0;i<pages.length;i++){
-
-let data=pages[i].toDataURL("image/png").split(",")[1]
-
-zip.file("page_"+(i+1)+".png",data,{base64:true})
-
-}
-
-let content=await zip.generateAsync({type:"blob"})
-
-let link=document.createElement("a")
-
-link.href=URL.createObjectURL(content)
-link.download="passport_pages.zip"
-
-link.click()
-
-}
-
-/* PDF */
-
-function downloadPDF(){
-
-if(pages.length==0){
-alert("Generate sheets first")
-return
-}
-
-const {jsPDF}=window.jspdf
-
-let pdf=new jsPDF({
-orientation:"landscape",
-unit:"px",
-format:[pageWidth,pageHeight]
-})
-
-pages.forEach((canvas,i)=>{
-
-let img=canvas.toDataURL("image/png")
-
-if(i>0) pdf.addPage()
-
-pdf.addImage(img,"PNG",0,0,pageWidth,pageHeight)
-
-})
-
-pdf.save("passport_photos.pdf")
-
-}
-
+(function() {
+    "use strict";
+
+    // --- Configuration ---
+    const PHOTO_W = 450;          // px at 300 DPI → 1.5 inch
+    const PHOTO_H = 600;          // px at 300 DPI → 2.0 inch
+    const PAGE_W = 1800;           // 6 inch
+    const PAGE_H = 1200;           // 4 inch
+    const PHOTOS_PER_PAGE = 8;
+    const PREVIEW_PAGES = 3;       // only show first 3 pages in UI
+
+    // Predefined grid positions [x, y]
+    const GRID = [
+        [0, 0], [450, 0], [900, 0], [1350, 0],
+        [0, 600], [450, 600], [900, 600], [1350, 600]
+    ];
+
+    // --- State ---
+    let pages = [];                 // Array of canvas (each page)
+    let imageList = [];             // Array of {img, name}
+    let abortController = null;
+
+    // --- DOM Elements ---
+    const loginPage = document.getElementById('loginPage');
+    const app = document.getElementById('app');
+    const userInput = document.getElementById('user');
+    const passInput = document.getElementById('pass');
+    const loginBtn = document.getElementById('loginBtn');
+    const upload = document.getElementById('upload');
+    const brightnessRange = document.getElementById('brightness');
+    const whiteBGCB = document.getElementById('whiteBG');
+    const showNameCB = document.getElementById('showName');
+    const generateBtn = document.getElementById('generateBtn');
+    const downloadPNGBtn = document.getElementById('downloadPNGBtn');
+    const downloadPDFBtn = document.getElementById('downloadPDFBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const previewDiv = document.getElementById('preview');
+    const loadingIndicator = document.getElementById('loadingIndicator');
+
+    // --- Login ---
+    loginBtn.addEventListener('click', () => {
+        if (userInput.value === 'admin' && passInput.value === '1234') {
+            loginPage.style.display = 'none';
+            app.style.display = 'block';
+        } else {
+            alert('❌ Incorrect credentials (use admin/1234)');
+        }
+    });
+
+    // --- Reset ---
+    resetBtn.addEventListener('click', () => {
+        pages = [];
+        imageList = [];
+        previewDiv.innerHTML = '';
+        upload.value = '';
+        if (abortController) {
+            abortController.abort();
+            abortController = null;
+        }
+    });
+
+    // --- Generate Sheets ---
+    generateBtn.addEventListener('click', async () => {
+        const files = upload.files;
+        if (!files || files.length === 0) {
+            alert('📂 Please select photos first.');
+            return;
+        }
+
+        // Reset previous run
+        if (abortController) abortController.abort();
+        abortController = new AbortController();
+        const signal = abortController.signal;
+
+        pages = [];
+        previewDiv.innerHTML = '';
+        imageList = [];
+
+        loadingIndicator.style.display = 'flex';
+
+        try {
+            // 1. Load all images asynchronously (with concurrency limit)
+            const loadPromises = [];
+            for (let file of files) {
+                if (signal.aborted) break;
+                loadPromises.push(loadImage(file, signal));
+            }
+            const loadedImages = await Promise.all(loadPromises);
+            imageList = loadedImages.filter(img => img !== null); // remove failed
+
+            if (imageList.length === 0) throw new Error('No valid images');
+
+            // 2. Process in chunks to avoid UI freeze
+            const brightness = parseInt(brightnessRange.value, 10);
+            const whiteBG = whiteBGCB.checked;
+            const showName = showNameCB.checked;
+
+            await processAllImages(imageList, brightness, whiteBG, showName, signal);
+
+        } catch (err) {
+            if (err.name !== 'AbortError') {
+                alert('⚠️ Processing failed: ' + err.message);
+                console.error(err);
+            }
+        } finally {
+            loadingIndicator.style.display = 'none';
+            abortController = null;
+        }
+    });
+
+    // Load one image and return a promise with {img, name}
+    function loadImage(file, signal) {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                if (signal.aborted) {
+                    resolve(null);
+                    return;
+                }
+                const img = new Image();
+                img.onload = () => {
+                    URL.revokeObjectURL(img.src); // clean up
+                    resolve({ img, name: file.name });
+                };
+                img.onerror = () => {
+                    URL.revokeObjectURL(img.src);
+                    console.warn('Failed to load:', file.name);
+                    resolve(null);
+                };
+                img.src = e.target.result;
+            };
+            reader.onerror = () => resolve(null);
+            reader.readAsDataURL(file);
+        });
+    }
+
+    // Process all images -> build pages array
+    async function processAllImages(images, brightness, whiteBG, showName, signal) {
+        const totalPages = Math.ceil(images.length / PHOTOS_PER_PAGE);
+        // Process page by page, but yield to event loop every few pages
+        for (let pageIdx = 0; pageIdx < totalPages; pageIdx++) {
+            if (signal.aborted) break;
+
+            // Create a new page canvas
+            const pageCanvas = document.createElement('canvas');
+            pageCanvas.width = PAGE_W;
+            pageCanvas.height = PAGE_H;
+            const ctx = pageCanvas.getContext('2d', { alpha: false }); // faster without alpha
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, PAGE_W, PAGE_H);
+
+            // Process each photo slot on this page
+            for let(i = 0; i < PHOTOS_PER_PAGE; i++) {
+                const imgIndex = pageIdx * PHOTOS_PER_PAGE + i;
+                if (imgIndex >= images.length) break;
+
+                const { img, name } = images[imgIndex];
+                const [x, y] = GRID[i];
+
+                // 1. Crop and resize to exact 450x600 with proper aspect ratio
+                const photoCanvas = cropToPassport(img, PHOTO_W, PHOTO_H);
+
+                // 2. Apply filters (brightness, whitening, smoothing)
+                applyFilters(photoCanvas, brightness, whiteBG);
+
+                // 3. Draw onto page
+                ctx.drawImage(photoCanvas, x, y, PHOTO_W, PHOTO_H);
+
+                // 4. Optionally draw name
+                if (showName) {
+                    ctx.font = 'bold 24px "Segoe UI", Arial, sans-serif';
+                    ctx.fillStyle = '#1e293b';
+                    ctx.textAlign = 'center';
+                    ctx.shadowColor = 'white';
+                    ctx.shadowBlur = 6;
+                    ctx.fillText(cleanName(name), x + PHOTO_W/2, y + PHOTO_H - 20);
+                    ctx.shadowColor = 'transparent';
+                }
+            }
+
+            pages.push(pageCanvas);
+
+            // Show preview only for first few pages
+            if (pageIdx < PREVIEW_PAGES) {
+                const previewCanvas = pageCanvas.cloneNode(true);
+                previewCanvas.classList.add('preview-canvas');
+                previewCanvas.style.width = 'min(100%, 540px)'; // scale preview
+                previewDiv.appendChild(previewCanvas);
+            }
+
+            // Yield to keep UI responsive
+            await new Promise(r => setTimeout(r, 0));
+        }
+    }
+
+    // Crop image to target width/height (center, maintain aspect ratio)
+    function cropToPassport(img, targetW, targetH) {
+        const canvas = document.createElement('canvas');
+        canvas.width = targetW;
+        canvas.height = targetH;
+        const ctx = canvas.getContext('2d');
+
+        const sourceW = img.width;
+        const sourceH = img.height;
+        const targetAR = targetW / targetH; // 0.75
+
+        let sx, sy, sWidth, sHeight;
+
+        if (sourceW / sourceH > targetAR) {
+            // Image is wider: crop width
+            sHeight = sourceH;
+            sWidth = sourceH * targetAR;
+            sx = (sourceW - sWidth) / 2;
+            sy = 0;
+        } else {
+            // Image is taller or equal: crop height
+            sWidth = sourceW;
+            sHeight = sourceW / targetAR;
+            sx = 0;
+            sy = (sourceH - sHeight) / 2;
+        }
+
+        ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, targetW, targetH);
+        return canvas;
+    }
+
+    // Apply brightness, whitening, and skin smoothing filters
+    function applyFilters(photoCanvas, brightness, whiteBG) {
+        const ctx = photoCanvas.getContext('2d');
+
+        // Base filter: brightness + slight contrast/saturation for skin smoothing
+        let filter = `brightness(${brightness}%) contrast(108%) saturate(105%) blur(0.3px)`;
+
+        if (whiteBG) {
+            // Boost whites: more contrast, push midtones up
+            filter = `brightness(${Math.min(130, brightness+10)}%) contrast(118%) saturate(102%) blur(0.3px)`;
+        }
+
+        ctx.filter = filter;
+        // Draw image onto itself to apply filter
+        ctx.drawImage(photoCanvas, 0, 0);
+        ctx.filter = 'none'; // reset
+    }
+
+    // Helper to clean filename for display
+    function cleanName(filename) {
+        return filename.replace(/\.[^/.]+$/, "").substring(0, 20);
+    }
+
+    // --- ZIP download (PNG pages) ---
+    downloadPNGBtn.addEventListener('click', async () => {
+        if (pages.length === 0) {
+            alert('Generate sheets first.');
+            return;
+        }
+
+        try {
+            loadingIndicator.style.display = 'flex';
+            const zip = new JSZip();
+
+            for (let i = 0; i < pages.length; i++) {
+                const canvas = pages[i];
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png', 1.0));
+                zip.file(`page_${i+1}.png`, blob);
+            }
+
+            const zipBlob = await zip.generateAsync({ type: 'blob' });
+            const url = URL.createObjectURL(zipBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'passport_sheets.zip';
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            alert('ZIP creation failed: ' + err.message);
+        } finally {
+            loadingIndicator.style.display = 'none';
+        }
+    });
+
+    // --- PDF download (print ready, 6x4 inch at 300 DPI) ---
+    downloadPDFBtn.addEventListener('click', () => {
+        if (pages.length === 0) {
+            alert('Generate sheets first.');
+            return;
+        }
+
+        try {
+            const { jsPDF } = window.jspdf;
+
+            // PDF dimensions in points (1/72 inch) for 6x4 inch
+            const pdfW = 432; // 6 * 72
+            const pdfH = 288; // 4 * 72
+
+            const pdf = new jsPDF({
+                orientation: 'landscape',
+                unit: 'pt',
+                format: [pdfW, pdfH]
+            });
+
+            for (let i = 0; i < pages.length; i++) {
+                if (i > 0) pdf.addPage();
+
+                const canvas = pages[i];
+                const imgData = canvas.toDataURL('image/png', 1.0);
+                // Image is 1800x1200 px, we want to fit exactly 432x288 pt (scale factor 0.24)
+                pdf.addImage(imgData, 'PNG', 0, 0, pdfW, pdfH, undefined, 'FAST');
+            }
+
+            pdf.save('passport_photos.pdf');
+        } catch (err) {
+            alert('PDF generation failed: ' + err.message);
+        }
+    });
+
+    // Helper to revoke object URLs on page unload (optional)
+    window.addEventListener('beforeunload', () => {
+        if (pages.length) {
+            pages.forEach(c => c = null);
+        }
+    });
+})();
 </script>
-
 </body>
 </html>
