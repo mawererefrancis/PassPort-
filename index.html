@@ -8,7 +8,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
-        /* (Same styles as before – no changes needed) */
+        /* (Same polished styles – no changes) */
         * {
             box-sizing: border-box;
             margin: 0;
@@ -283,7 +283,7 @@
 <div id="app">
     <div class="topbar">
         <span>🏫 School Passport Photo System</span>
-        <span class="badge">v2.0 · 300 DPI</span>
+        <span class="badge">v3.0 · Memory‑optimized</span>
     </div>
 
     <div class="controls">
@@ -323,22 +323,21 @@
     "use strict";
 
     // --- Configuration ---
-    const PHOTO_W = 450;          // px at 300 DPI → 1.5 inch
-    const PHOTO_H = 600;          // px at 300 DPI → 2.0 inch
-    const PAGE_W = 1800;           // 6 inch
-    const PAGE_H = 1200;           // 4 inch
+    const PHOTO_W = 450;
+    const PHOTO_H = 600;
+    const PAGE_W = 1800;
+    const PAGE_H = 1200;
     const PHOTOS_PER_PAGE = 8;
-    const PREVIEW_PAGES = 3;       // only show first 3 pages in UI
+    const PREVIEW_PAGES = 3;       // only keep these many in memory
 
-    // Predefined grid positions [x, y]
     const GRID = [
         [0, 0], [450, 0], [900, 0], [1350, 0],
         [0, 600], [450, 600], [900, 600], [1350, 600]
     ];
 
     // --- State ---
-    let pages = [];                 // Array of canvas (each page)
-    let imageList = [];             // Array of {img, name}
+    let imageList = [];             // array of {img, name} – loaded images
+    let previewPages = [];          // canvases for preview (first few pages)
     let abortController = null;
 
     // --- DOM Elements ---
@@ -370,8 +369,10 @@
 
     // --- Reset ---
     resetBtn.addEventListener('click', () => {
-        pages = [];
+        // Release image object URLs
+        imageList.forEach(item => URL.revokeObjectURL(item.img.src));
         imageList = [];
+        previewPages = [];
         previewDiv.innerHTML = '';
         upload.value = '';
         if (abortController) {
@@ -380,7 +381,7 @@
         }
     });
 
-    // --- Generate Sheets ---
+    // --- Generate Sheets (preview only) ---
     generateBtn.addEventListener('click', async () => {
         const files = upload.files;
         if (!files || files.length === 0) {
@@ -388,35 +389,40 @@
             return;
         }
 
-        // Reset previous run
+        // Abort previous generation if any
         if (abortController) abortController.abort();
         abortController = new AbortController();
         const signal = abortController.signal;
 
-        pages = [];
+        // Clear previous previews
+        previewPages.forEach(c => c = null);
+        previewPages = [];
         previewDiv.innerHTML = '';
+
+        // Release old image URLs
+        imageList.forEach(item => URL.revokeObjectURL(item.img.src));
         imageList = [];
 
         loadingIndicator.style.display = 'flex';
 
         try {
-            // 1. Load all images asynchronously (with concurrency limit)
+            // 1. Load all images
             const loadPromises = [];
             for (let file of files) {
                 if (signal.aborted) break;
                 loadPromises.push(loadImage(file, signal));
             }
-            const loadedImages = await Promise.all(loadPromises);
-            imageList = loadedImages.filter(img => img !== null); // remove failed
+            const loaded = await Promise.all(loadPromises);
+            imageList = loaded.filter(img => img !== null);
 
             if (imageList.length === 0) throw new Error('No valid images');
 
-            // 2. Process in chunks to avoid UI freeze
+            // 2. Generate only preview pages (first few)
             const brightness = parseInt(brightnessRange.value, 10);
             const whiteBG = whiteBGCB.checked;
             const showName = showNameCB.checked;
 
-            await processAllImages(imageList, brightness, whiteBG, showName, signal);
+            await generatePreview(imageList, brightness, whiteBG, showName, signal);
 
         } catch (err) {
             if (err.name !== 'AbortError') {
@@ -429,7 +435,7 @@
         }
     });
 
-    // Load one image and return a promise with {img, name}
+    // Load one image – returns {img, name} or null
     function loadImage(file, signal) {
         return new Promise((resolve) => {
             const reader = new FileReader();
@@ -440,7 +446,7 @@
                 }
                 const img = new Image();
                 img.onload = () => {
-                    URL.revokeObjectURL(img.src); // clean up
+                    // Keep object URL for later use; we'll revoke on reset
                     resolve({ img, name: file.name });
                 };
                 img.onerror = () => {
@@ -455,66 +461,69 @@
         });
     }
 
-    // Process all images -> build pages array
-    async function processAllImages(images, brightness, whiteBG, showName, signal) {
+    // Generate only the first PREVIEW_PAGES and store in previewPages
+    async function generatePreview(images, brightness, whiteBG, showName, signal) {
         const totalPages = Math.ceil(images.length / PHOTOS_PER_PAGE);
-        // Process page by page, but yield to event loop every few pages
-        for (let pageIdx = 0; pageIdx < totalPages; pageIdx++) {
+        const pagesToShow = Math.min(totalPages, PREVIEW_PAGES);
+
+        for (let pageIdx = 0; pageIdx < pagesToShow; pageIdx++) {
             if (signal.aborted) break;
 
-            // Create a new page canvas
-            const pageCanvas = document.createElement('canvas');
-            pageCanvas.width = PAGE_W;
-            pageCanvas.height = PAGE_H;
-            const ctx = pageCanvas.getContext('2d', { alpha: false }); // faster without alpha
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, PAGE_W, PAGE_H);
+            const canvas = await renderPage(images, pageIdx, brightness, whiteBG, showName);
+            previewPages.push(canvas);
 
-            // Process each photo slot on this page
-            for (let i = 0; i < PHOTOS_PER_PAGE; i++) {   // <--- FIXED SYNTAX HERE
-                const imgIndex = pageIdx * PHOTOS_PER_PAGE + i;
-                if (imgIndex >= images.length) break;
-
-                const { img, name } = images[imgIndex];
-                const [x, y] = GRID[i];
-
-                // 1. Crop and resize to exact 450x600 with proper aspect ratio
-                const photoCanvas = cropToPassport(img, PHOTO_W, PHOTO_H);
-
-                // 2. Apply filters (brightness, whitening, smoothing)
-                applyFilters(photoCanvas, brightness, whiteBG);
-
-                // 3. Draw onto page
-                ctx.drawImage(photoCanvas, x, y, PHOTO_W, PHOTO_H);
-
-                // 4. Optionally draw name
-                if (showName) {
-                    ctx.font = 'bold 24px "Segoe UI", Arial, sans-serif';
-                    ctx.fillStyle = '#1e293b';
-                    ctx.textAlign = 'center';
-                    ctx.shadowColor = 'white';
-                    ctx.shadowBlur = 6;
-                    ctx.fillText(cleanName(name), x + PHOTO_W/2, y + PHOTO_H - 20);
-                    ctx.shadowColor = 'transparent';
-                }
-            }
-
-            pages.push(pageCanvas);
-
-            // Show preview only for first few pages
-            if (pageIdx < PREVIEW_PAGES) {
-                const previewCanvas = pageCanvas.cloneNode(true);
-                previewCanvas.classList.add('preview-canvas');
-                previewCanvas.style.width = 'min(100%, 540px)'; // scale preview
-                previewDiv.appendChild(previewCanvas);
-            }
+            // Add to preview area (scaled down for display)
+            const previewCanvas = canvas.cloneNode(true);
+            previewCanvas.classList.add('preview-canvas');
+            previewCanvas.style.width = 'min(100%, 540px)';
+            previewDiv.appendChild(previewCanvas);
 
             // Yield to keep UI responsive
             await new Promise(r => setTimeout(r, 0));
         }
     }
 
-    // Crop image to target width/height (center, maintain aspect ratio)
+    // Render a single page (index starting at 0) and return canvas
+    async function renderPage(images, pageIdx, brightness, whiteBG, showName) {
+        const canvas = document.createElement('canvas');
+        canvas.width = PAGE_W;
+        canvas.height = PAGE_H;
+        const ctx = canvas.getContext('2d', { alpha: false });
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, PAGE_W, PAGE_H);
+
+        const startIdx = pageIdx * PHOTOS_PER_PAGE;
+        for (let i = 0; i < PHOTOS_PER_PAGE; i++) {
+            const imgIndex = startIdx + i;
+            if (imgIndex >= images.length) break;
+
+            const { img, name } = images[imgIndex];
+            const [x, y] = GRID[i];
+
+            // Crop to passport ratio
+            const photoCanvas = cropToPassport(img, PHOTO_W, PHOTO_H);
+
+            // Apply filters
+            applyFilters(photoCanvas, brightness, whiteBG);
+
+            // Draw onto page
+            ctx.drawImage(photoCanvas, x, y, PHOTO_W, PHOTO_H);
+
+            // Optional name
+            if (showName) {
+                ctx.font = 'bold 24px "Segoe UI", Arial, sans-serif';
+                ctx.fillStyle = '#1e293b';
+                ctx.textAlign = 'center';
+                ctx.shadowColor = 'white';
+                ctx.shadowBlur = 6;
+                ctx.fillText(cleanName(name), x + PHOTO_W/2, y + PHOTO_H - 20);
+                ctx.shadowColor = 'transparent';
+            }
+        }
+        return canvas;
+    }
+
+    // Crop image to target dimensions (center, maintain aspect)
     function cropToPassport(img, targetW, targetH) {
         const canvas = document.createElement('canvas');
         canvas.width = targetW;
@@ -545,44 +554,51 @@
         return canvas;
     }
 
-    // Apply brightness, whitening, and skin smoothing filters
+    // Apply filters for skin smoothing & whitening
     function applyFilters(photoCanvas, brightness, whiteBG) {
         const ctx = photoCanvas.getContext('2d');
-
-        // Base filter: brightness + slight contrast/saturation for skin smoothing
         let filter = `brightness(${brightness}%) contrast(108%) saturate(105%) blur(0.3px)`;
-
         if (whiteBG) {
-            // Boost whites: more contrast, push midtones up
             filter = `brightness(${Math.min(130, brightness+10)}%) contrast(118%) saturate(102%) blur(0.3px)`;
         }
-
         ctx.filter = filter;
-        // Draw image onto itself to apply filter
         ctx.drawImage(photoCanvas, 0, 0);
-        ctx.filter = 'none'; // reset
+        ctx.filter = 'none';
     }
 
-    // Helper to clean filename for display
+    // Clean filename for display
     function cleanName(filename) {
         return filename.replace(/\.[^/.]+$/, "").substring(0, 20);
     }
 
-    // --- ZIP download (PNG pages) ---
+    // --- ZIP download (regenerates pages on the fly, no memory buildup) ---
     downloadPNGBtn.addEventListener('click', async () => {
-        if (pages.length === 0) {
-            alert('Generate sheets first.');
+        if (imageList.length === 0) {
+            alert('Please generate sheets first (or upload photos).');
             return;
         }
 
+        const totalPages = Math.ceil(imageList.length / PHOTOS_PER_PAGE);
+        const brightness = parseInt(brightnessRange.value, 10);
+        const whiteBG = whiteBGCB.checked;
+        const showName = showNameCB.checked;
+
+        loadingIndicator.style.display = 'flex';
         try {
-            loadingIndicator.style.display = 'flex';
             const zip = new JSZip();
 
-            for (let i = 0; i < pages.length; i++) {
-                const canvas = pages[i];
-                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png', 1.0));
-                zip.file(`page_${i+1}.png`, blob);
+            for (let pageIdx = 0; pageIdx < totalPages; pageIdx++) {
+                // Render one page
+                const canvas = await renderPage(imageList, pageIdx, brightness, whiteBG, showName);
+                // Convert to blob
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png', 0.9));
+                zip.file(`page_${pageIdx+1}.png`, blob);
+                // Free canvas
+                canvas.width = 0;
+                canvas.height = 0;
+
+                // Update UI occasionally
+                if (pageIdx % 5 === 0) await new Promise(r => setTimeout(r, 0));
             }
 
             const zipBlob = await zip.generateAsync({ type: 'blob' });
@@ -599,17 +615,21 @@
         }
     });
 
-    // --- PDF download (print ready, 6x4 inch at 300 DPI) ---
-    downloadPDFBtn.addEventListener('click', () => {
-        if (pages.length === 0) {
-            alert('Generate sheets first.');
+    // --- PDF download (regenerates pages on the fly) ---
+    downloadPDFBtn.addEventListener('click', async () => {
+        if (imageList.length === 0) {
+            alert('Please generate sheets first (or upload photos).');
             return;
         }
 
+        const totalPages = Math.ceil(imageList.length / PHOTOS_PER_PAGE);
+        const brightness = parseInt(brightnessRange.value, 10);
+        const whiteBG = whiteBGCB.checked;
+        const showName = showNameCB.checked;
+
+        loadingIndicator.style.display = 'flex';
         try {
             const { jsPDF } = window.jspdf;
-
-            // PDF dimensions in points (1/72 inch) for 6x4 inch
             const pdfW = 432; // 6 * 72
             const pdfH = 288; // 4 * 72
 
@@ -619,26 +639,31 @@
                 format: [pdfW, pdfH]
             });
 
-            for (let i = 0; i < pages.length; i++) {
-                if (i > 0) pdf.addPage();
+            for (let pageIdx = 0; pageIdx < totalPages; pageIdx++) {
+                if (pageIdx > 0) pdf.addPage();
 
-                const canvas = pages[i];
-                const imgData = canvas.toDataURL('image/png', 1.0);
-                // Image is 1800x1200 px, we want to fit exactly 432x288 pt (scale factor 0.24)
+                const canvas = await renderPage(imageList, pageIdx, brightness, whiteBG, showName);
+                const imgData = canvas.toDataURL('image/png', 0.9);
                 pdf.addImage(imgData, 'PNG', 0, 0, pdfW, pdfH, undefined, 'FAST');
+
+                // Free canvas
+                canvas.width = 0;
+                canvas.height = 0;
+
+                if (pageIdx % 5 === 0) await new Promise(r => setTimeout(r, 0));
             }
 
             pdf.save('passport_photos.pdf');
         } catch (err) {
             alert('PDF generation failed: ' + err.message);
+        } finally {
+            loadingIndicator.style.display = 'none';
         }
     });
 
-    // Helper to revoke object URLs on page unload (optional)
+    // Clean up on page unload
     window.addEventListener('beforeunload', () => {
-        if (pages.length) {
-            pages.forEach(c => c = null);
-        }
+        imageList.forEach(item => URL.revokeObjectURL(item.img.src));
     });
 })();
 </script>
